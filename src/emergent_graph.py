@@ -266,6 +266,15 @@ def _r2(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return 1.0 - (ss_res / ss_tot)
 
 
+def _aic(y_true: np.ndarray, y_pred: np.ndarray, n_params: int) -> float:
+    n_obs = int(len(y_true))
+    if n_obs <= 0:
+        return float("nan")
+    rss = float(np.sum((y_true - y_pred) ** 2))
+    rss = max(rss, 1.0e-12)
+    return float(n_obs * np.log(rss / n_obs) + 2.0 * float(n_params))
+
+
 def _inverse_model(b: np.ndarray, a: float, b0: float, c: float) -> np.ndarray:
     return a / (b + b0) + c
 
@@ -327,7 +336,9 @@ def run_weak_scaling_fit(
         r2_inv = _r2(y, y_inv)
         r2_lin = _r2(y, y_lin)
         r2_const = _r2(y, y_const)
-        rows.append([float(k), a_fit, b0_fit, c_fit, r2_inv, r2_lin, r2_const])
+        aic_inv = _aic(y, y_inv, n_params=3)
+        aic_lin = _aic(y, y_lin, n_params=2)
+        rows.append([float(k), a_fit, b0_fit, c_fit, r2_inv, r2_lin, r2_const, aic_inv, aic_lin])
 
         ax.scatter(x, y, s=24, label="data")
         ax.plot(x, y_inv, "-", lw=2, label="inverse fit")
@@ -350,7 +361,7 @@ def run_weak_scaling_fit(
         output_dir / f"{suffix}.csv",
         table,
         delimiter=",",
-        header="k,A,b0,C,r2_inverse,r2_linear,r2_constant",
+        header="k,A,b0,C,r2_inverse,r2_linear,r2_constant,aic_inverse,aic_linear",
         comments="",
     )
     if mode == "hard_blob":
@@ -358,7 +369,7 @@ def run_weak_scaling_fit(
             output_dir / "graph_scaling_fit.csv",
             table,
             delimiter=",",
-            header="k,A,b0,C,r2_inverse,r2_linear,r2_constant",
+            header="k,A,b0,C,r2_inverse,r2_linear,r2_constant,aic_inverse,aic_linear",
             comments="",
         )
     return table
