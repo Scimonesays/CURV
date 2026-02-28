@@ -1,8 +1,35 @@
-.venv/
+# Python
 __pycache__/
-.pytest_cache/
 *.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
 
-# Keep outputs reproducible and repo clean
-outputs/*
-!outputs/.gitkeep
+# Virtual env
+.venv/
+venv/
+
+# Build / local tooling
+dist/
+build/
+*.egg-info/
+
+# CURV generated outputs (never commit)
+results/
+outputs/
+
+# Logs / traces
+logs/
+*.log
+
+# Local registries / run ledgers (generated)
+results/registry/
+results/certification/
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
