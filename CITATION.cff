@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+title: "New GR Toy Models"
+message: "If you use this repository, please cite it using this metadata."
+type: software
+authors:
+  - family-names: "Contributors"
+    given-names: "New GR Toy Models"
+repository-code: "https://github.com/<YOUR_USER>/<REPO_NAME>"
+license: "MIT"
+keywords:
+  - general relativity
+  - lensing
+  - toy models
+  - reproducibility
+abstract: >
+  Reproducible Python toy models for Schwarzschild lensing, emergent weighted-graph
+  lensing analogies, and normalized comparison plots.

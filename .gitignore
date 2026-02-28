@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Keep outputs reproducible and repo clean
+outputs/*
+!outputs/.gitkeep
