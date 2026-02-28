@@ -1,0 +1,43 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "useGitignore": true,
+  "ignorePaths": [
+    "results/**",
+    "outputs/**",
+    "**/__pycache__/**",
+    "**/*.pyc"
+  ],
+  "words": [
+    "CURV",
+    "a0p01",
+    "bmax",
+    "bmin",
+    "connNA",
+    "eikonal",
+    "expNA",
+    "geodesic",
+    "g1p01",
+    "kNA",
+    "lam",
+    "macroscale",
+    "NNA",
+    "parameterizations",
+    "phase4a",
+    "phase4b",
+    "ppn",
+    "prefilter",
+    "pytest",
+    "schwarzschild",
+    "sigNA",
+    "superposition",
+    "sweepable",
+    "tailv",
+    "tnew",
+    "venv",
+    "wfpush",
+    "wfpsh",
+    "wfref",
+    "yukawa"
+  ]
+}

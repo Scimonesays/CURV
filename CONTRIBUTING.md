@@ -17,6 +17,8 @@ python -m pytest -q
 python -m src.gr_schwarzschild
 python -m src.emergent_graph
 python -m src.compare
+python -m src.constraints
+python -m src.trial_pipeline --gamma 1.0 --alpha 0.0 --lambda-au 1.0 --notes "registry check"
 ```
 
 ## Add a new toy model
@@ -34,6 +36,17 @@ python -m src.compare
 - Keep typical full pipeline runtime under 60 seconds on a normal laptop.
 - Keep dependencies minimal and documented in `requirements.txt`.
 - Prefer explicit assumptions over implicit behavior.
+- `results/registry/constraints_registry.csv` is append-only; do not edit prior rows.
+- Registry `notes` should stay compact and audit-focused (gate summaries, source checks, promotion notes).
+
+## Documentation update checklist
+
+When behavior, thresholds, or artifact paths change:
+
+1. Update `README.md` sections that describe phases, CLI usage, and outputs.
+2. Update `Methodology.md` to keep gates and evidence policy consistent.
+3. Keep terms consistent across docs (`run_id`, `artifacts`, `constraints_registry.csv`).
+4. Ensure examples are executable in Windows PowerShell.
 
 ## Scope rule
 
