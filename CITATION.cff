@@ -1,17 +1,20 @@
 cff-version: 1.2.0
-title: "New GR Toy Models"
+title: "CURV: Constraint-Unified Residual Validator"
 message: "If you use this repository, please cite it using this metadata."
 type: software
 authors:
   - family-names: "Contributors"
-    given-names: "New GR Toy Models"
-repository-code: "https://github.com/<YOUR_USER>/<REPO_NAME>"
+    given-names: "CURV"
+repository-code: "https://github.com/Scimonesays/CURV"
+version: "v0.1.1-certified"
+date-released: "2026-02-28"
 license: "MIT"
 keywords:
   - general relativity
-  - lensing
-  - toy models
+  - constraints
+  - certification
   - reproducibility
 abstract: >
-  Reproducible Python toy models for Schwarzschild lensing, emergent weighted-graph
-  lensing analogies, and normalized comparison plots.
+  CURV is a reproducible, deterministic validation instrument for testing
+  gravity-model residual deviations under baseline, gate, and certification
+  constraints.

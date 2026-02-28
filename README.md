@@ -9,12 +9,12 @@ It eliminates inconsistent deviations.
 
 Formal framing is available in `WHITEPAPER.md`.
 
-### Certified Baseline
+### Quick Public Baseline
 
-* **Tier 1 Certified Baseline:** `Tier1_Certified_GR_Baseline`
-* **Tag:** `v0.1.0-certified`
-* **Commit:** `da8e3ed`
-* **Certification:** `results/certification/20260228_184324Z_cert_v0.1_da8e3ed/`
+* **What CURV is:** a reproducible, falsifier-first instrument for constraint-based gravity deviation testing.
+* **What CURV is not:** evidence of new physics, propulsion claims, or anomaly interpretation.
+* **Reproduce certification:** `python certification/run_certification.py`
+* **Certified tags:** `v0.1.0-certified` (original Tier-1 anchor), `v0.1.1-certified` (publication-clean baseline with tests + docs).
 
 ---
 
