@@ -1,0 +1,13 @@
+{
+  "baseline_version": "0.1",
+  "expected": {
+    "best_gamma_ppn": 1.0,
+    "c3_monotonic_pruning": true
+  },
+  "tolerances": {
+    "best_gamma_ppn_abs": 0.02,
+    "c2_h_pair_max_delta": 0.02
+  },
+  "notes": "Instrument-grade baseline for certification v0.1. Update only via explicit baseline workflow."
+}
+

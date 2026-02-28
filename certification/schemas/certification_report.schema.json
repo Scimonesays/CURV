@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CURV Certification Report v0.1",
+  "type": "object",
+  "required": [
+    "cert_version",
+    "timestamp",
+    "git_commit",
+    "tests",
+    "overall_status",
+    "failure_codes"
+  ],
+  "properties": {
+    "cert_version": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "git_commit": {
+      "type": "string"
+    },
+    "tests": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["status", "details", "metrics"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["PASS", "FAIL"]
+          },
+          "details": {
+            "type": "string"
+          },
+          "metrics": {
+            "type": "object"
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failure_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "overall_status": {
+      "type": "string",
+      "enum": ["PASS", "FAIL"]
+    },
+    "failure_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
+
