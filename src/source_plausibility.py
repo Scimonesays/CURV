@@ -9,7 +9,13 @@ from typing import Any
 
 import numpy as np
 
+from .coupling_scale_calibrator import calibrated_report_for_length, format_calibrated_note
 from .curvature_cost import curvature_cost_sanity
+from .exotic_power_feasibility import (
+    ExoticPowerPolicy,
+    evaluate_exotic_power_feasibility,
+    exotic_policy_from_preset,
+)
 from .results_registry import (
     RESULTS_REGISTRY_COLUMNS,
     append_csv_row,
@@ -20,6 +26,7 @@ from .results_registry import (
 )
 
 STEFAN_BOLTZMANN = 5.670374419e-8
+DEFAULT_ACTIVE_VOLUME_M3 = 1.0
 
 
 @dataclass(frozen=True)
@@ -94,6 +101,16 @@ _CANDIDATES: tuple[SourceCandidate, ...] = (
         external_source=True,
         speculative=True,
     ),
+    SourceCandidate(
+        name="exotic_matter_hypothetical",
+        specific_energy_j_per_kg=float("inf"),
+        specific_power_w_per_kg=float("inf"),
+        coupling_efficiency=1.0,
+        containment_feasibility="tripwire",
+        thermal_area_limit_m2=float("inf"),
+        stability_bias=0.15,
+        speculative=True,
+    ),
 )
 
 
@@ -133,6 +150,13 @@ def evaluate_source_plausibility(
     mission_duration_s: float | None,
     reference_mass_kg: float = 1000.0,
     radiator_temp_k: float = 1200.0,
+    active_volume_m3: float = DEFAULT_ACTIVE_VOLUME_M3,
+    exotic_preset: str | None = None,
+    allow_speculative_exotic: bool = False,
+    exotic_max_rho_j_m3: float = 1.0e18,
+    exotic_max_total_energy_j: float = 1.0e15,
+    exotic_max_negative_energy_j: float = 0.0,
+    exotic_assumed_negative_energy_j: float | None = None,
 ) -> tuple[np.ndarray, dict[str, Any]]:
     """
     Evaluate source classes in mass-free mode using specific demands.
@@ -150,6 +174,8 @@ def evaluate_source_plausibility(
         raise ValueError("reference_mass_kg must be positive.")
     if radiator_temp_k <= 0.0:
         raise ValueError("radiator_temp_k must be positive.")
+    if active_volume_m3 <= 0.0:
+        raise ValueError("active_volume_m3 must be positive.")
 
     req_specific_energy = energy_j / reference_mass_kg
     req_specific_power = power_w / reference_mass_kg
@@ -159,16 +185,47 @@ def evaluate_source_plausibility(
     source_pass_names: list[str] = []
     reject_names: list[str] = []
     score_map: dict[str, float] = {}
+    candidate_evaluations: dict[str, dict[str, Any]] = {}
 
     radiator_flux = STEFAN_BOLTZMANN * (radiator_temp_k**4)
     for idx, c in enumerate(_CANDIDATES):
-        energy_pass = bool(req_specific_energy <= c.specific_energy_j_per_kg) or bool(c.external_source)
-        power_pass = bool(req_specific_power <= c.specific_power_w_per_kg)
-        waste_heat_w = power_w * ((1.0 / max(c.coupling_efficiency, 1.0e-12)) - 1.0)
-        heat_area_m2 = waste_heat_w / max(radiator_flux, 1.0e-15)
-        thermal_pass = bool(heat_area_m2 <= c.thermal_area_limit_m2)
-        containment_pass = _containment_pass(c.containment_feasibility)
-        source_pass = bool(energy_pass and power_pass and thermal_pass and containment_pass)
+        exotic_eval: dict[str, Any] | None = None
+        if c.name == "exotic_matter_hypothetical":
+            if exotic_preset is not None:
+                policy = exotic_policy_from_preset(
+                    exotic_preset,
+                    allow_speculative_override=allow_speculative_exotic if exotic_preset == "normal" else None,
+                )
+            else:
+                policy = ExoticPowerPolicy(
+                    allow_speculative=bool(allow_speculative_exotic),
+                    max_rho_j_m3=float(exotic_max_rho_j_m3),
+                    max_total_energy_j=float(exotic_max_total_energy_j),
+                    enforce_negative_energy_budget=True,
+                    max_negative_energy_j=float(exotic_max_negative_energy_j),
+                )
+            exotic_eval = evaluate_exotic_power_feasibility(
+                required_power_w=float(power_w),
+                mission_duration_s=float(duration_s),
+                active_volume_m3=float(active_volume_m3),
+                policy=policy,
+                assumed_negative_energy_j=exotic_assumed_negative_energy_j,
+            )
+            energy_pass = True
+            power_pass = True
+            waste_heat_w = 0.0
+            heat_area_m2 = 0.0
+            thermal_pass = True
+            containment_pass = bool(exotic_eval["passed"])
+            source_pass = bool(exotic_eval["passed"])
+        else:
+            energy_pass = bool(req_specific_energy <= c.specific_energy_j_per_kg) or bool(c.external_source)
+            power_pass = bool(req_specific_power <= c.specific_power_w_per_kg)
+            waste_heat_w = power_w * ((1.0 / max(c.coupling_efficiency, 1.0e-12)) - 1.0)
+            heat_area_m2 = waste_heat_w / max(radiator_flux, 1.0e-15)
+            thermal_pass = bool(heat_area_m2 <= c.thermal_area_limit_m2)
+            containment_pass = _containment_pass(c.containment_feasibility)
+            source_pass = bool(energy_pass and power_pass and thermal_pass and containment_pass)
 
         # Score near 1.0 means plenty of margin; negative means over-demand.
         energy_margin = 1.0 - (req_specific_energy / max(c.specific_energy_j_per_kg, 1.0e-15))
@@ -176,6 +233,15 @@ def evaluate_source_plausibility(
         thermal_margin = 1.0 - (heat_area_m2 / max(c.thermal_area_limit_m2, 1.0e-15))
         stability_margin = float(min(energy_margin, power_margin, thermal_margin) * c.stability_bias)
         score_map[c.name] = stability_margin
+        candidate_evaluations[c.name] = {
+            "energy_pass": bool(energy_pass),
+            "power_pass": bool(power_pass),
+            "thermal_pass": bool(thermal_pass),
+            "containment_pass": bool(containment_pass),
+            "source_pass": bool(source_pass),
+            "stability_margin": float(stability_margin),
+            "exotic_tripwire": exotic_eval if exotic_eval is not None else "NA",
+        }
 
         if source_pass:
             source_pass_names.append(c.name)
@@ -212,6 +278,7 @@ def evaluate_source_plausibility(
         "required_specific_energy_j_per_kg": float(req_specific_energy),
         "required_specific_power_w_per_kg": float(req_specific_power),
         "radiator_temp_k": float(radiator_temp_k),
+        "active_volume_m3": float(active_volume_m3),
         "n_candidates": int(len(_CANDIDATES)),
         "n_pass": int(len(source_pass_names)),
         "all_fail": bool(len(source_pass_names) == 0),
@@ -219,6 +286,7 @@ def evaluate_source_plausibility(
         "pass_candidates": source_pass_names,
         "reject_candidates": reject_names,
         "candidate_labels": labels,
+        "candidate_evaluations": candidate_evaluations,
     }
     return table, summary
 
@@ -231,6 +299,13 @@ def run_source_plausibility_trial(
     mission_duration_s: float | None,
     reference_mass_kg: float = 1000.0,
     radiator_temp_k: float = 1200.0,
+    active_volume_m3: float = DEFAULT_ACTIVE_VOLUME_M3,
+    exotic_preset: str | None = None,
+    allow_speculative_exotic: bool = False,
+    exotic_max_rho_j_m3: float = 1.0e18,
+    exotic_max_total_energy_j: float = 1.0e15,
+    exotic_max_negative_energy_j: float = 0.0,
+    exotic_assumed_negative_energy_j: float | None = None,
     bubble_l_m: float | None = None,
     bubble_geometry: str = "sphere",
     bubble_thickness_m: float | None = None,
@@ -262,6 +337,13 @@ def run_source_plausibility_trial(
         mission_duration_s=mission_duration_s,
         reference_mass_kg=reference_mass_kg,
         radiator_temp_k=radiator_temp_k,
+        active_volume_m3=active_volume_m3,
+        exotic_preset=exotic_preset,
+        allow_speculative_exotic=allow_speculative_exotic,
+        exotic_max_rho_j_m3=exotic_max_rho_j_m3,
+        exotic_max_total_energy_j=exotic_max_total_energy_j,
+        exotic_max_negative_energy_j=exotic_max_negative_energy_j,
+        exotic_assumed_negative_energy_j=exotic_assumed_negative_energy_j,
     )
     csv_path = metrics_dir / f"{run_id}_source_plausibility.csv"
     np.savetxt(
@@ -310,6 +392,7 @@ def run_source_plausibility_trial(
     note_parts = [note_base]
     if curv_summary is not None:
         curv_gate = "pass" if bool(curv_summary["curv_gate_pass"]) else "fail"
+        cal_note = format_calibrated_note(calibrated_report_for_length(float(curv_summary["L_m"])))
         curv_note = (
             "curv_cost: "
             f"L={curv_summary['L_m']}m "
@@ -332,9 +415,25 @@ def run_source_plausibility_trial(
             "}; "
             f"reasons=[{reasons}]"
         )
-        note_parts.extend([curv_note, curv_gate_note])
+        note_parts.extend([curv_note, curv_gate_note, cal_note])
     if notes:
         note_parts.append(f"user_notes={notes}")
+    exotic_eval = summary.get("candidate_evaluations", {}).get("exotic_matter_hypothetical")
+    if isinstance(exotic_eval, dict):
+        tripwire = exotic_eval.get("exotic_tripwire")
+        reasons = tripwire.get("reasons", []) if isinstance(tripwire, dict) else []
+        reasons_text = ",".join(str(x) for x in reasons) if reasons else "none"
+        dominant = tripwire.get("dominant_violation", "none") if isinstance(tripwire, dict) else "none"
+        exotic_pass = bool(exotic_eval.get("source_pass"))
+        preset_part = f"preset={exotic_preset}; " if exotic_preset else ""
+        note_parts.append(
+            "exotic_tripwire: "
+            f"pass={str(exotic_pass).lower()}; "
+            f"{preset_part}"
+            f"allow_speculative={str(bool(allow_speculative_exotic)).lower()}; "
+            f"dominant={dominant}; "
+            f"reasons=[{reasons_text}]"
+        )
     note_text = "; ".join(note_parts)
 
     best_idx = summary["candidate_labels"].index(best)

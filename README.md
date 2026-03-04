@@ -9,12 +9,27 @@ It eliminates inconsistent deviations.
 
 Formal framing is available in `WHITEPAPER.md`.
 
+**Run Log:**
+All constraint sweeps and promotion evaluations are recorded in `CURV_RUN_LOG.md`.
+Structural rules are versioned and frozen unless explicitly revised.
+
 ### Quick Public Baseline
 
 * **What CURV is:** a reproducible, falsifier-first instrument for constraint-based gravity deviation testing.
 * **What CURV is not:** evidence of new physics, propulsion claims, or anomaly interpretation.
 * **Reproduce certification:** `python certification/run_certification.py`
 * **Certified tags:** `v0.1.0-certified` (original Tier-1 anchor), `v0.1.1-certified` (publication-clean baseline with tests + docs).
+
+**Regenerate Source Regime Atlas (power-vs-duration map)**
+```powershell
+python scripts/run_source_phase_map.py `
+  --power-min-w 1e4 --power-max-w 1e9 --power-steps 31 `
+  --duration-min-s 1e2 --duration-max-s 1e5 --duration-steps 25 `
+  --active-radius-m 10 `
+  --curvature-cal 2.08e-43 `
+  --k-target-10m 1e-2 `
+  --k-target-1km 1e-6
+```
 
 ---
 
@@ -86,6 +101,88 @@ To test its boundaries rigorously.
 # Architecture Overview
 
 CURV operates in layered validation phases.
+
+---
+
+## Constraint Pipeline (Execution Order)
+
+This is the practical run order used by sweep-time constraint evaluation:
+
+```text
+[START: parameter point θ, window W, threshold wf_thresh]
+
+   |
+   v
+(0) Generate curves / residuals / derived metrics
+
+   |
+   v
+(1) Gate 0  ✅ HARD GATE (earliest kill)
+    A) Weak-field tail median rel error   < wf_thresh
+    B) Resolution consistency (h vs h/2)  < 0.15
+    C) Known-limit recovery (model→GR)    < 0.05
+    -> if FAIL: stop this (θ,W,wf_thresh)
+
+   |
+   v
+(2) Residual-structure checks  ✅ PROMOTION CHECKS (Candidate/Strong)
+    - oscillation control (sign_changes <= 1)        [candidate]
+    - local smoothness / anti-knife-edge metrics     [candidate/strong]
+    - endpoint dominance ratio < 0.95                [strong-only]
+    NOTE: "adjacent survivor / non_knife_edge_region"
+          is NOT used here; it is INVESTIGATE-only.
+
+   |
+   v
+(3) Tail-sign significance verdict  ✅ PROMOTION CHECK
+    - deterministic: pass / fail / na
+    - default: binomial sign test, alpha=0.05
+    - only explicit "fail" blocks STRONG promotion
+
+   |
+   v
+(4) Exotic tripwire  🟨 ALWAYS COMPUTED + LOGGED (incl. atlas outputs)
+    - wec_tripwire / nec_tripwire
+    - scaling-tripwire (p > p_max)
+    - rho-budget tripwire
+    -> becomes ✅ HARD GATE only with --use-exotic-tripwire-gate
+
+   |
+   v
+(5) Emit window-level result for W
+
+   |
+   v
+(6) Multi-window robustness aggregation  ✅ PROMOTION CHECK (cross-window)
+    - compute robust_window_count from windows tested
+    - NOTE: "range_robust_two_windows" label is inconsistent:
+
+      Yukawa sweep:
+        "two_windows" == (robust_window_count >= 2)
+
+      PPN sweep:
+        "two_windows" == (robust_window_count >= 1)   <-- label mismatch
+
+   |
+   v
+(7) Promotion ladder evaluation  ✅ PROMOTION CHECK (final)
+    none -> candidate -> strong_candidate -> investigate
+    - INVESTIGATE checks include:
+        * non_knife_edge_region (adjacent survivor requirement)
+
+   |
+   v
+(8) Threshold tightening schedule loop  ✅ HARD META-FILTER
+    - repeat (0)-(7) for stricter wf_thresh schedule
+      PPN:    0.25 -> 0.15 -> 0.10
+      Yukawa: 0.05 -> 0.03 -> 0.02
+
+   |
+   v
+(9) Optional / separate paths  🟨 (not in core sweep ladder unless wired)
+    - source / curvature plausibility gates
+    - legacy Phase 4B observable bounds module
+```
 
 ---
 
@@ -218,6 +315,7 @@ Compact namespaced summaries are recorded in `notes`:
 * `promote:`
 * `wfref:`
 * `curv_cost:`
+* `exotic_tripwire:` (in source plausibility: power-feasibility tripwire; in `scripts/run_exotic_tripwire.py`: stress-energy proxy)
 
 Full diagnostics remain in JSON artifacts.
 
@@ -284,137 +382,21 @@ If a deviation survives tightening, it earns scrutiny.
 If it fails, it is removed.
 
 Constraint precedes curiosity.
-# CURV
 
-**Constraint-Unified Residual Validator**
+---
 
-CURV is an open, reproducible validator for testing residual curvature-model deviations against structural gravity benchmarks and real-world constraints.
+## Documentation Index
 
-## What CURV Is
+| Doc | Purpose |
+|-----|---------|
+| `WHITEPAPER.md` | Formal framing |
+| `CURV_RUN_LOG.md` | Constraint sweeps, promotion evaluations, structural rules |
+| `docs/exotic_tripwire.md` | Exotic stress-energy tripwire (proxy instrument) |
+| `docs/exotic_power_feasibility.md` | Exotic power feasibility tripwire (source plausibility) |
+| `docs/notes/PILOT_YUKAWA_11x9_NOTES_20260228.md` | Yukawa pilot run notes |
+| `results/TEST_FINDINGS_20260228.md` | Test evidence and sweep commands |
 
-CURV is a computational validation framework that:
-
-- Simulates General Relativity (GR) baselines.
-- Builds controlled emergent-geometry toy models.
-- Compares structural behaviors (scaling, superposition, robustness).
-- Filters theoretical deviations using observational constraints.
-
-It is a falsifier-first instrument for testing assumptions about geometry, gravity, and field behavior.
-
-## What CURV Is Not
-
-- It is not proof of new physics.
-- It is not evidence of propulsion breakthroughs.
-- It is not a zero-point energy project.
-- It is not a UFO explanation engine.
-
-It is a controlled environment for disciplined residual validation.
-
-## Core Purpose
-
-### 1) Test whether emergent geometry can mimic gravity structurally
-
-Not cosmetically, structurally:
-
-- Does it reproduce weak-field inverse-distance scaling?
-- Does it approximately superpose?
-- Is it resolution-robust?
-- Does it behave like a field, or like a routing artifact?
-
-If it fails, the model is rejected or refined.
-
-### 2) Build a candidate filter for "new GR" deviations
-
-Add parameterized deviations (Yukawa and PPN-like corrections) and test them against:
-
-- Light deflection constraints
-- Perihelion precession targets
-- Weak-field limits
-
-The goal is to rapidly eliminate large regions of parameter space.
-
-### 3) Establish a reproducible curvature testing framework
-
-Every run should include:
-
-- Fixed seeds
-- Logged parameters
-- Measured metrics
-- Saved outputs
-- Git-tracked commit hash
-
-No mysticism, only curves, fits, and thresholds.
-
-## Why This Matters
-
-GR performs extremely well, but known limits remain:
-
-- Singularities
-- Quantum scales
-- Early-universe conditions
-
-If spacetime is emergent, modified, or incomplete, structural hints should appear in controlled analog systems.
-
-CURV asks:
-
-> What minimum structural properties must any viable gravity model reproduce?
-
-## Long-Term Aim
-
-Not to create energy, and not to build warp drives.
-
-The long-term aim is to:
-
-- Understand curvature as a structural phenomenon.
-- Identify which theoretical directions survive constraint.
-- Provide an open computational lab for gravity hypothesis testing.
-
-## Immediate Roadmap
-
-### Phase 4A (completed baseline)
-
-- Validated smooth emergent-geometry scaling checks.
-- Tested superposition behavior.
-- Tested resolution robustness.
-
-### Phase 4B (current)
-
-- Run Yukawa and PPN-like deviation modules through deterministic gates.
-- Constrain candidate regions with solar-system observables.
-- Promote surviving regions with auditable ladder criteria.
-
-### Phase 5
-
-- Expand to orbit precession simulations.
-- Evaluate continuous ray-tracing (eikonal-style) methods.
-
-## Quickstart (Windows PowerShell)
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-
-python -m pytest -q
-python -m src.gr_schwarzschild
-python -m src.emergent_graph
-python -m src.compare
-python -m src.constraints
-```
-
-## Reproducibility Guarantees
-
-- Parameters and computation paths are deterministic.
-- Running module entrypoints regenerates `outputs/` from source.
-- Practical local check: tests pass and expected artifacts are present.
-
-## Registry-Backed Phase 4B CLI
-
-Run a Phase 4B trial that appends to `results/registry/constraints_registry.csv`:
-
-```powershell
-python -m src.trial_pipeline --gamma 1.0 --alpha 0.0 --lambda-au 1.0 --notes "baseline phase4b"
-```
+---
 
 ## Theory Rig
 
@@ -516,6 +498,12 @@ python scripts/run_theory_deflection.py `
 - In source plausibility mode with bubble inputs:
   - `gateA_pass = gateA_pass AND curv_gate_pass`
 
+**Exotic power feasibility tripwire**
+- An `exotic_matter_hypothetical` candidate is always evaluated and logged but **fails by default** (evidence gate).
+- Use `--exotic-preset strict|normal|sandbox` for comparable runs; `--allow-speculative-exotic` enables speculative mode (for `normal` preset).
+- Output includes `dominant_violation` (`evidence_gate`, `rho_ceiling`, etc.) for actionable failure reasons.
+- See `docs/exotic_power_feasibility.md`.
+
 **CLI usage**
 ```powershell
 python scripts/run_source_plausibility.py `
@@ -528,6 +516,7 @@ python scripts/run_source_plausibility.py `
 python scripts/run_source_plausibility.py `
   --required-energy-j 1e9 `
   --required-power-w 1e6 `
+  --exotic-preset strict `
   --bubble-L-m 10 `
   --bubble-geometry sphere `
   --notes "v1p2_curvature_sanity"
@@ -542,6 +531,21 @@ python scripts/run_source_plausibility.py `
   --bubble-thickness-m 0.5 `
   --notes "v1p2_curvature_shell"
 ```
+
+#### Source Regime Atlas (2026-03-01)
+
+A reproducible phase sweep maps source feasibility separately from curvature implications.
+
+- Sweep command: `python scripts/run_source_phase_map.py --power-min-w 1e4 --power-max-w 1e9 --power-steps 31 --duration-min-s 1e2 --duration-max-s 1e5 --duration-steps 25 --active-radius-m 10 --curvature-cal 2.08e-43 --k-target-10m 1e-2 --k-target-1km 1e-6`
+- Exotic presets and `--allow-speculative-exotic` supported; when speculative mode is on, `run_id` is suffixed with `_speculative` and the summary includes `plot_annotation: "SPECULATIVE MODE"` to avoid misreading plots.
+- Artifacts:
+  - `results/artifacts/20260301_194455Z_energy_source_phase_map/metrics/20260301_194455Z_energy_source_phase_map_source_phase_map.csv`
+  - `results/artifacts/20260301_194455Z_energy_source_phase_map/raw/20260301_194455Z_energy_source_phase_map_phase_map_summary.json`
+- Regime result over 775 points: feasible points are dominated by `hydrocarbon_engine` and `fission_reactor`; `li_ion_battery` survives only in a small low-power/short-duration region; `fusion_speculative`, `antimatter_extreme`, and `beamed_power` have no feasible region under current gate logic; `exotic_matter_hypothetical` is always computed and logged but fails by default (evidence gate) unless `--allow-speculative-exotic` is set and ceilings are satisfied.
+- Failure frontier is mainly thermal-limited, with containment as a secondary rejection mode.
+- Curvature overlay remains microscopically small across the full grid (`max K_ratio_10m ~= 4.97e-31`, `max K_ratio_1km ~= 4.97e-27`), by construction of the 10 m active-volume assumption and calibration constant.
+
+**Moral:** Sustainable power is not the bottleneck for megawatt systems; curvature is.
 
 ### v1.3 — PPN Parameter Sweep Constraints
 
@@ -720,11 +724,76 @@ python scripts/sweep_ppn_constraints.py `
   --notes "wfpush_050_030_020_numeric"
 ```
 
+### Exotic Tripwire (Standalone)
+
+Run the exotic stress-energy tripwire on an existing sweep/run:
+
+```powershell
+python scripts/run_exotic_tripwire.py --input-run-id <run_id> --b-window 100:1000
+```
+
+See `docs/exotic_tripwire.md` for proxy definitions, scoring, and full CLI options.
+
+### v1.7 — Yukawa 2D Constraint Sweep (alpha_y, lambda_y_over_m)
+
+**Purpose**
+- v1.7 adds a dedicated 2-parameter sweep for the Yukawa residual family to map survivorship topology under the same deterministic Gate 0 and promotion ladder stack used by PPN sweeps.
+
+**Model family (instrument form)**
+- Theory plugin: `gr_yukawa_deviation`
+- Deflection proxy:
+  - `alpha(b) = (4 / b) * (1 + alpha_y * exp(-b / lambda_y_over_m))`
+- GR limit is explicit at `alpha_y = 0`.
+
+**What it writes**
+- `metrics/<run_id>_yukawa_sweep_results.csv`
+- `metrics/<run_id>_yukawa_survivors.csv`
+- `raw/<run_id>_yukawa_sweep_summary.json`
+- `raw/<run_id>_promotion_eval.json`
+- `plots/<run_id>_yukawa_survivor_heatmap.png` (unless `--no-plots`)
+
+**Summary fields to inspect first**
+- `survivors_by_thresh`
+- `best_params`
+- `best_params_by_thresh`
+- `failure_reason_counts` (includes Gate-0 fail buckets and tail-sign NA reasons)
+- `promotion_level`
+
+**Pilot sanity-check run (recommended first)**
+```powershell
+python scripts/sweep_yukawa_constraints.py `
+  --alpha-min -0.10 --alpha-max 0.10 --alpha-steps 11 `
+  --lambda-min 1 --lambda-max 1000 --lambda-steps 9 --lambda-spacing log `
+  --wf-thresh-seq "0.05,0.03,0.02" `
+  --range-windows "50:500,100:1000" `
+  --n-points 320 --h 0.18 `
+  --wf-ref-mode numeric `
+  --notes "pilot_11x9"
+```
+
+**Full sweep run**
+```powershell
+python scripts/sweep_yukawa_constraints.py `
+  --alpha-min -0.10 --alpha-max 0.10 --alpha-steps 41 `
+  --lambda-min 1 --lambda-max 1000 --lambda-steps 21 --lambda-spacing log `
+  --wf-thresh-seq "0.05,0.03,0.02" `
+  --range-windows "50:500,100:1000" `
+  --n-points 320 --h 0.18 `
+  --wf-ref-mode numeric `
+  --notes "full_41x21"
+```
+
+**Interpretation guardrails**
+- Treat this as a deterministic constraint-engine family, not a full physically faithful Yukawa lensing derivation.
+- Expect monotonic pruning as thresholds tighten; non-monotonic behavior should be diagnosed via `failure_reason_counts` and per-window/tail diagnostics.
+- Pilot before full sweep to confirm artifact semantics and runtime behavior on your machine.
+
 CURV does not attempt to prove speculative propulsion concepts. It attempts to eliminate physically inconsistent ones using geometry, energy accounting, and conservative scaling filters.
 
 ## Latest Test Evidence
 
 - Dated run log and findings: `results/TEST_FINDINGS_20260228.md`
+- `docs/notes/PILOT_YUKAWA_11x9_NOTES_20260228.md` — Yukawa pilot attempt notes (11x9), runtime + failure mode, next diagnostic run.
 - Includes executed commands, pass/fail outcomes, edge-of-allowed Phase 4B probe, energy-scaling simulation anchors, and artifact paths.
 
 ## Energy Sweep Repro Snippet
@@ -790,4 +859,3 @@ For exact sweep command blocks, assumptions, formulas, and numeric outcomes, see
 - Graph phase is a discrete shortest-path toy model with a local entanglement-weight boost in a mass region.
 - Graph deflection is exit-node shift (grid units), not a physical angle.
 - Matching normalized curve shape does not imply physical equivalence.
-# CURV

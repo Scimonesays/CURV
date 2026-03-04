@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.source_plausibility import run_source_plausibility_trial
+from src.source_plausibility import DEFAULT_ACTIVE_VOLUME_M3, run_source_plausibility_trial
 
 
 def main() -> None:
@@ -23,6 +23,18 @@ def main() -> None:
     parser.add_argument("--mission-duration-s", type=float, default=None)
     parser.add_argument("--reference-mass-kg", type=float, default=1000.0)
     parser.add_argument("--radiator-temp-k", type=float, default=1200.0)
+    parser.add_argument("--active-volume-m3", type=float, default=None)
+    parser.add_argument(
+        "--exotic-preset",
+        choices=["strict", "normal", "sandbox"],
+        default=None,
+        help="Exotic policy preset (strict/normal/sandbox). Overrides individual exotic flags.",
+    )
+    parser.add_argument("--allow-speculative-exotic", action="store_true")
+    parser.add_argument("--exotic-max-rho-j-m3", type=float, default=1.0e18)
+    parser.add_argument("--exotic-max-total-energy-j", type=float, default=1.0e15)
+    parser.add_argument("--exotic-max-negative-energy-j", type=float, default=0.0)
+    parser.add_argument("--assumed-negative-energy-j", type=float, default=None)
     parser.add_argument("--bubble-L-m", type=float, default=None)
     parser.add_argument("--bubble-geometry", choices=["sphere", "shell"], default="sphere")
     parser.add_argument("--bubble-thickness-m", type=float, default=None)
@@ -37,6 +49,17 @@ def main() -> None:
         mission_duration_s=args.mission_duration_s,
         reference_mass_kg=float(args.reference_mass_kg),
         radiator_temp_k=float(args.radiator_temp_k),
+        active_volume_m3=(
+            float(args.active_volume_m3)
+            if args.active_volume_m3 is not None
+            else float(DEFAULT_ACTIVE_VOLUME_M3)
+        ),
+        exotic_preset=args.exotic_preset,
+        allow_speculative_exotic=bool(args.allow_speculative_exotic),
+        exotic_max_rho_j_m3=float(args.exotic_max_rho_j_m3),
+        exotic_max_total_energy_j=float(args.exotic_max_total_energy_j),
+        exotic_max_negative_energy_j=float(args.exotic_max_negative_energy_j),
+        exotic_assumed_negative_energy_j=args.assumed_negative_energy_j,
         bubble_l_m=args.bubble_L_m,
         bubble_geometry=str(args.bubble_geometry),
         bubble_thickness_m=args.bubble_thickness_m,
