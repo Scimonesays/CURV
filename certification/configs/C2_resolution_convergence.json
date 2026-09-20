@@ -1,22 +1,14 @@
 {
-  "base_sweep": {
-    "gamma_min": 0.99,
-    "gamma_max": 1.01,
-    "gamma_steps": 3,
-    "wf_thresh_seq": [0.25, 0.15, 0.1],
-    "range_windows": [[80.0, 150.0]],
-    "wf_ref_mode": "analytic",
-    "wf_eps_denom": 1e-15,
-    "tail_eps_abs": 1e-6,
-    "tail_eps_rel": 0.01,
-    "tail_sign_k": 20,
-    "min_tail_significant": 8,
-    "tail_sign_mode": "binomial",
-    "tail_sign_alpha": 0.05
-  },
-  "n_points_seq": [8, 12, 16],
-  "h_seq": [0.5, 0.4],
-  "gamma_band_tol": 0.02,
-  "h_pair_tol": 0.01
+  "range_window": [
+    80,
+    150
+  ],
+  "n_points": 8,
+  "h_seq": [
+    0.6,
+    0.4,
+    0.25
+  ],
+  "max_pair_delta": 0.005,
+  "weak_field_tail_max": 0.1
 }
-
