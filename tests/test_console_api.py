@@ -52,7 +52,18 @@ def test_timeline_and_catalog():
     assert client.get("/api/timeline").status_code == 200
     assert client.get("/api/catalog").status_code == 200
     assert client.get("/api/certification/latest").status_code == 200
-    assert client.get("/api/lanes").status_code == 200
+    lanes = client.get("/api/lanes")
+    assert lanes.status_code == 200
+    assert any(item["id"] == "ufs" for item in lanes.json()["lanes"])
+
+
+def test_ufs_overview_safe_when_repo_missing():
+    r = client.get("/api/ufs")
+    assert r.status_code == 200
+    body = r.json()
+    assert "connected" in body
+    assert "frontier" in body
+    assert "gaps" in body
 
 
 def test_path_sandbox_blocks_escape():
