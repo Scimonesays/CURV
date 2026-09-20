@@ -16,6 +16,7 @@ All registries live under `results/registry/`. Each has a `.csv` and `.jsonl` mi
 | bubble_registry | `bubble_registry.csv` / `.jsonl` | `run_bubble_experiment_analysis.py` | Exotic Feasibility |
 | breakthrough_ladder_registry | `breakthrough_ladder_registry.csv` / `.jsonl` | `run_breakthrough_ladder.py` | Claim Evaluation |
 | batch_registry | `batch_registry.csv` / `.jsonl` | `finalize_batch.py` (via `trial_pipeline`) | Theory Validation |
+| ufs_validation_registry | `ufs_validation_registry.csv` / `.jsonl` | `run_ufs_candidate_validation.py` | UFS Research Validation |
 
 ---
 
@@ -120,6 +121,21 @@ Breakthrough ladder runs (multi-step UFO tests).
 | deepest_step | Highest step passed without speculation |
 | first_fail_step | First failing step |
 | artifacts, notes | Artifacts and notes |
+
+### ufs_validation_registry
+
+Universal Frequency Spectrum structural-readiness runs.
+
+| Column | Description |
+|--------|-------------|
+| timestamp_utc, run_id, git_hash | Identifiers |
+| ufs_record_id | Canonical UFS target ID |
+| record_type | Frontier or gap |
+| canonical_status | UFS status at validation time |
+| policy, speculative_mode | CURV policy context |
+| readiness_verdict | `READY_FOR_CONSTRAINT_DESIGN`, `NEEDS_OPERATIONALIZATION`, or `HOLD_EVIDENCE` |
+| n_pass, n_fail, failed_gates | Structural readiness gate summary |
+| artifacts, notes | Reproducible result artifact and semantic warning |
 
 ### batch_registry
 
