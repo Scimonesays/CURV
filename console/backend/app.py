@@ -89,7 +89,7 @@ def ufs_overview() -> dict[str, Any]:
 def ufs_record(record_id: str) -> dict[str, Any]:
     try:
         return get_ufs_record(record_id)
-    except FileNotFoundError as exc:
+    except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(503, str(exc)) from exc
     except KeyError as exc:
         raise HTTPException(404, f"Unknown UFS record: {record_id}") from exc
