@@ -68,20 +68,29 @@ def safe_cmd(cmd: list[str], cwd: Path | None = None, timeout_s: float | None = 
 
 
 def ensure_bootstrap(repo_root: Path) -> list[str]:
-    """Best-effort local bootstrap with stdlib only."""
-    logs: list[str] = []
-    venv_dir = repo_root / ".venv"
-    if not venv_dir.exists():
-        code, out = safe_cmd([sys.executable, "-m", "venv", str(venv_dir)], cwd=repo_root, timeout_s=45)
-        logs.append(f"venv_create_rc={code}")
-        if out:
-            logs.append(out)
+    """Best-effort bootstrap into the interpreter actually running certification."""
+    logs: list[str] = [f"bootstrap_python={sys.executable}"]
+    required_modules = ("numpy", "scipy", "matplotlib")
+    missing: list[str] = []
+    for module_name in required_modules:
+        try:
+            importlib.import_module(module_name)
+        except Exception:
+            missing.append(module_name)
+
     req = repo_root / "requirements.txt"
-    if req.exists():
-        code, out = safe_cmd([sys.executable, "-m", "pip", "install", "-r", str(req)], cwd=repo_root, timeout_s=45)
+    if missing and req.exists():
+        code, out = safe_cmd(
+            [sys.executable, "-m", "pip", "install", "-r", str(req)],
+            cwd=repo_root,
+            timeout_s=120,
+        )
         logs.append(f"pip_install_rc={code}")
+        logs.append(f"pip_install_missing={','.join(missing)}")
         if out:
             logs.append(out.splitlines()[-1] if out.splitlines() else "")
+    else:
+        logs.append("pip_install_skipped=dependencies_available")
     return logs
 
 
