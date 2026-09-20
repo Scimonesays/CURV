@@ -20,6 +20,7 @@ Structural rules are versioned and frozen unless explicitly revised.
 * **Reproduce certification:** `python certification/run_certification.py`
 * **Certified tags:** `v0.1.0-certified` (original Tier-1 anchor), `v0.1.1-certified` (publication-clean baseline with tests + docs).
 * **Instrument Console (local UI):** see [console/README.md](console/README.md) — evidence-first lab console over registries and scripts.
+* **Universal Frequency Spectrum bridge:** the console can read a sibling/configured UFS canonical dataset and run structural-readiness validation without modifying UFS. See [docs/UFS_INTEGRATION.md](docs/UFS_INTEGRATION.md).
 
 **Regenerate Source Regime Atlas (power-vs-duration map)**
 ```powershell
@@ -316,6 +317,7 @@ All runs append immutable rows to registry files under `results/registry/`. Each
 | bubble_registry | `bubble_registry.csv` / `.jsonl` | Bubble experiment analysis |
 | breakthrough_ladder_registry | `breakthrough_ladder_registry.csv` / `.jsonl` | Breakthrough ladder runs |
 | batch_registry | `batch_registry.csv` / `.jsonl` | Batch verdicts |
+| ufs_validation_registry | `ufs_validation_registry.csv` / `.jsonl` | UFS frontier/question readiness validations |
 
 Compact namespaced summaries are recorded in `notes` (where applicable): `gate0:`, `ppn_sweep:`, `tailv:`, `promote:`, `wfref:`, `curv_cost:`, `exotic_tripwire:`. Full schema and writer scripts: [docs/REGISTRY_MAP.md](docs/REGISTRY_MAP.md). CI runs `python scripts/check_registry_docs.py` to ensure README registry paths match the canonical list.
 
@@ -391,6 +393,7 @@ Constraint precedes curiosity.
 |-----|---------|
 | `docs/PROGRAM_PURPOSE.md` | **Canonical program definition**, three lanes, breakthrough semantics |
 | `docs/REGISTRY_MAP.md` | Registry paths, writer scripts, row schemas |
+| `docs/UFS_INTEGRATION.md` | Read-only UFS bridge and research-readiness validator contract |
 | `WHITEPAPER.md` | Formal framing |
 | `CURV_RUN_LOG.md` | Constraint sweeps, promotion evaluations, structural rules |
 | `docs/exotic_tripwire.md` | Exotic stress-energy tripwire (proxy instrument) |
