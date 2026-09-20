@@ -83,9 +83,11 @@ def main() -> int:
         "created_utc": ts,
         "reviewed_for_canonical_ingest": False,
         "review_notes": None,
-        "curv_readiness": result,
     }
-    artifact.write_text(json.dumps(external_result, indent=2), encoding="utf-8")
+    artifact.write_text(
+        json.dumps({"schema_version": "1.0.0", "records": [external_result]}, indent=2),
+        encoding="utf-8",
+    )
 
     failed = [g["id"] for g in result["gates"] if g["status"] == "FAIL"]
     row = {
