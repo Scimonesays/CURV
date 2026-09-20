@@ -116,15 +116,31 @@ def _run_job(job_id: str) -> None:
     run_id_re = re.compile(r"\brun_id[=:\s]+([A-Za-z0-9_.-]+)")
     try:
         with log_path.open("w", encoding="utf-8", errors="replace") as logf:
-            proc = subprocess.Popen(
-                job["argv"],
-                cwd=job["cwd"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-            )
+            # Check cancellation and create/register the process under one lock so
+            # cancel_job cannot lose a request in the gap before Popen is tracked.
             with _lock:
+                current = _jobs.get(job_id, job)
+                if current.get("cancel_requested"):
+                    job = current
+                    job["status"] = "CANCELLED"
+                    job["error"] = "cancelled"
+                    _jobs[job_id] = job
+                    return
+                job = current
+                popen_kwargs: dict[str, Any] = {}
+                if sys.platform == "win32":
+                    popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+                else:
+                    popen_kwargs["start_new_session"] = True
+                proc = subprocess.Popen(
+                    job["argv"],
+                    cwd=job["cwd"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    **popen_kwargs,
+                )
                 job["pid"] = proc.pid
                 _processes[job_id] = proc
                 _jobs[job_id] = job
@@ -214,7 +230,14 @@ def cancel_job(job_id: str) -> dict[str, Any]:
 
     try:
         if proc is not None and proc.poll() is None:
-            proc.terminate()
+            pid = int(proc.pid)
+            if sys.platform == "win32":
+                subprocess.run(["taskkill", "/PID", str(pid), "/F", "/T"], check=False, capture_output=True)
+            else:
+                import os
+                import signal
+
+                os.killpg(os.getpgid(pid), signal.SIGTERM)
         elif job.get("pid"):
             pid = int(job["pid"])
             if sys.platform == "win32":
@@ -223,7 +246,7 @@ def cancel_job(job_id: str) -> dict[str, Any]:
                 import os
                 import signal
 
-                os.kill(pid, signal.SIGTERM)
+                os.killpg(os.getpgid(pid), signal.SIGTERM)
     except ProcessLookupError:
         pass
     except Exception as exc:
