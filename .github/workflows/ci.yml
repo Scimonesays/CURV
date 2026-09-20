@@ -63,6 +63,14 @@ jobs:
       - run: pip install -r requirements.txt
       - run: pip check
       - run: python certification/run_certification.py
+      - name: Upload certification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: curv-certification-${{ github.sha }}
+          path: results/certification/
+          if-no-files-found: warn
+          retention-days: 14
 
 
   python-security:
