@@ -1,44 +1,59 @@
 {
   "base_sweep": {
-    "gamma_min": 0.99,
-    "gamma_max": 1.01,
-    "gamma_steps": 3,
-    "wf_thresh_seq": [0.25, 0.15, 0.1],
-    "range_windows": [[80.0, 150.0]],
-    "n_points": 10,
+    "gamma_min": 0.94,
+    "gamma_max": 1.08,
+    "gamma_steps": 15,
+    "wf_thresh_seq": [
+      0.25,
+      0.15,
+      0.1
+    ],
+    "range_windows": [
+      [
+        80,
+        150
+      ]
+    ],
+    "n_points": 8,
     "h": 0.5,
     "wf_ref_mode": "analytic",
     "wf_eps_denom": 1e-15,
-    "tail_eps_abs": 1e-6,
+    "tail_eps_abs": 0.000001,
     "tail_eps_rel": 0.01,
     "tail_sign_k": 20,
     "min_tail_significant": 8,
     "tail_sign_mode": "binomial",
     "tail_sign_alpha": 0.05
   },
-  "perturbations": [
-    {
-      "h": 0.5,
-      "tail_eps_abs": 1e-6,
-      "wf_ref_mode": "analytic"
-    },
-    {
-      "h": 0.45,
-      "tail_eps_abs": 1e-6,
-      "wf_ref_mode": "analytic"
-    },
-    {
-      "h": 0.55,
-      "tail_eps_abs": 1e-6,
-      "wf_ref_mode": "analytic"
-    },
-    {
-      "h": 0.5,
-      "tail_eps_abs": 5e-7,
-      "wf_ref_mode": "numeric"
-    }
-  ],
-  "gamma_tol": 0.01,
-  "mode_gamma_tol": 0.015
+  "mode_runs": {
+    "analytic": [
+      {
+        "label": "baseline",
+        "h": 0.5
+      },
+      {
+        "label": "h_finer",
+        "h": 0.45
+      },
+      {
+        "label": "h_coarser",
+        "h": 0.55
+      }
+    ],
+    "numeric": [
+      {
+        "label": "baseline",
+        "h": 0.5
+      },
+      {
+        "label": "h_finer",
+        "h": 0.45
+      },
+      {
+        "label": "h_coarser",
+        "h": 0.55
+      }
+    ]
+  },
+  "within_mode_gamma_tol": 0.01
 }
-
