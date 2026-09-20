@@ -1,0 +1,17 @@
+{
+  "baseline_version": "0.2",
+  "scope": "CURV gravity-core computational certification invariants",
+  "expected": {
+    "best_gamma_ppn": 1,
+    "c2_convergence_nonworsening": true,
+    "c3_monotonic_pruning": true,
+    "c3_actual_pruning": true,
+    "c4_within_mode_promotion_invariant": true
+  },
+  "tolerances": {
+    "best_gamma_ppn_abs": 1e-12,
+    "c2_h_pair_max_delta": 0.005,
+    "c4_within_mode_gamma_max_delta": 0.01
+  },
+  "notes": "Acceptance baseline for certification v0.2. Cross-reference analytic-vs-numeric promotion differences are diagnostic and are not treated as numerical-instability failures."
+}
