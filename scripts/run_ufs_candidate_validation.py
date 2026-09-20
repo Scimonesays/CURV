@@ -68,7 +68,6 @@ def main() -> int:
     artifact = raw_dir / f"{run_id}_ufs_validation.json"
 
     external_result = {
-        "schema_version": "1.0.0",
         "id": f"UFS-VAL-{run_id}",
         "provider": "CURV",
         "target_record_id": args.record_id,
