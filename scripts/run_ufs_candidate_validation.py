@@ -88,7 +88,7 @@ def main() -> int:
         "review_notes": None,
     }
     artifact.write_text(
-        json.dumps({"schema_version": "1.0.0", "records": [external_result]}, indent=2),
+        json.dumps({"schema_version": "1.0.0", "dataset_type": "validations", "records": [external_result]}, indent=2),
         encoding="utf-8",
     )
 
