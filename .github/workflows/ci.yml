@@ -26,3 +26,19 @@ jobs:
         with:
           python-version: "3.12"
       - run: python scripts/check_registry_docs.py
+
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: console/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: console/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
