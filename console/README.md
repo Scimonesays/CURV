@@ -50,7 +50,7 @@ Always visible:
 - **Promotion strip** — none → gate0 → candidate → strong_candidate → investigate → certified
 - **Timeline** — recent jobs / registry events
 
-Lane rail (text only): Theory · Claims · Exotic · Certification
+Lane rail (text only): Theory · Claims · Exotic · UFS · Certification
 
 ## Views
 
@@ -60,9 +60,22 @@ Lane rail (text only): Theory · Claims · Exotic · Certification
 | Run Detail | Gates, plots, metrics, raw JSON |
 | Launch | Secondary — spawn catalogued scripts |
 | Survivorship / Scorecard / Ladder / Atlas | Lane depth |
+| UFS Workspace | Read-only UFS canonical frontier/gaps + readiness validation |
 | Certification | C1–C6 matrix |
 
 Right column: **Reproducibility Panel** + **Copy Reproduction Command** (exact argv from job history).
+
+## UFS connection
+
+The UFS lane reads a local Universal Frequency Spectrum checkout without modifying it.
+
+Set:
+
+```powershell
+$env:UFS_REPO_PATH = "C:\\path\\to\\Universal-Frequency-Spectrum"
+```
+
+or clone UFS beside CURV. See [docs/UFS_INTEGRATION.md](../docs/UFS_INTEGRATION.md).
 
 ## Safety
 
