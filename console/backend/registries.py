@@ -100,11 +100,17 @@ def recent_registry_events(limit: int = 40) -> list[dict[str, Any]]:
 
 
 def _event_label(registry: str, row: dict[str, str]) -> str:
-    mode = row.get("model_mode") or row.get("profile") or row.get("instrument") or registry
+    mode = row.get("model_mode") or row.get("profile") or row.get("instrument") or row.get("ufs_record_id") or registry
     return str(mode)
 
 
 def _event_status(registry: str, row: dict[str, str]) -> str:
+    if registry == "ufs_validation_registry":
+        verdict = (row.get("readiness_verdict") or "").upper()
+        if verdict == "READY_FOR_CONSTRAINT_DESIGN":
+            return "PASS"
+        if verdict in {"NEEDS_OPERATIONALIZATION", "HOLD_EVIDENCE", "INCONCLUSIVE"}:
+            return "WARNING"
     if registry.startswith("ufo") or "verdict" in row:
         verdict = (row.get("verdict") or "").lower()
         if "implausible" in verdict:
