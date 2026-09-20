@@ -27,6 +27,7 @@ from .paths import (
 from .registries import list_registries, read_registry
 from .runs import get_repro, get_run_detail, read_csv_preview
 from .timeline import get_timeline
+from .ufs import overview as get_ufs_overview, record as get_ufs_record
 
 ensure_dirs()
 
@@ -64,10 +65,26 @@ def lanes() -> dict[str, Any]:
             {"id": "theory", "label": "Theory"},
             {"id": "claims", "label": "Claims"},
             {"id": "exotic", "label": "Exotic"},
+            {"id": "ufs", "label": "UFS"},
             {"id": "certification", "label": "Certification"},
         ],
         "registries_by_lane": LANE_REGISTRIES,
     }
+
+
+@app.get("/api/ufs")
+def ufs_overview() -> dict[str, Any]:
+    return get_ufs_overview()
+
+
+@app.get("/api/ufs/records/{record_id}")
+def ufs_record(record_id: str) -> dict[str, Any]:
+    try:
+        return get_ufs_record(record_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except KeyError as exc:
+        raise HTTPException(404, f"Unknown UFS record: {record_id}") from exc
 
 
 @app.get("/api/registries")
