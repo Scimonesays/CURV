@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-CERT_VERSION = "0.1"
+CERT_VERSION = "0.2"
 TEST_SEQUENCE = [
     ("C1_reference_reproduction", "certification.tests.C1_reference_reproduction"),
     ("C2_resolution_convergence", "certification.tests.C2_resolution_convergence"),
@@ -159,7 +159,7 @@ def run() -> int:
         # Provide prior metrics to downstream checks.
         test_cfg["upstream_results"] = upstream_results
         if test_id == "C6_regression_lock":
-            test_cfg["baseline_path"] = "certification/baselines/certified_baseline_v0.1.json"
+            test_cfg["baseline_path"] = "certification/baselines/baseline_v0.2.json"
 
         module = importlib.import_module(module_name)
         result = module.run(test_cfg, out_dir)
