@@ -1,11 +1,11 @@
-"""C3: Gate sensitivity structure certification test."""
+"""C3: Gate-sensitivity and deterministic-pruning certification test."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
-from .common import PASS, fail_result, guard_run, load_json, run_sweep
+from .common import PASS, guard_run, load_json, run_sweep
 
 
 def _survivor_count(summary: dict[str, Any], threshold: float) -> int:
@@ -44,20 +44,30 @@ def run(test_config: dict, out_dir: Path) -> dict:
 
         monotonic = n_tight <= n_base <= n_loose
         deterministic = n_base == n_base_2
+        actual_pruning = n_tight < n_loose
 
-        max_jump = int(test_config.get("max_topology_jump", 200))
-        smooth = abs(n_base - n_tight) <= max_jump and abs(n_loose - n_base) <= max_jump
+        grid_n = int(base_cfg["gamma_steps"])
+        max_jump_fraction = float(test_config.get("max_topology_jump_fraction", 0.5))
+        jump_tight_to_base = abs(n_base - n_tight) / max(grid_n, 1)
+        jump_base_to_loose = abs(n_loose - n_base) / max(grid_n, 1)
+        smooth = max(jump_tight_to_base, jump_base_to_loose) <= max_jump_fraction
 
         codes: list[str] = []
         if not monotonic:
             codes.append("C3_FAIL_CHAOTIC_PRUNING")
         if not deterministic:
             codes.append("C3_FAIL_NONDETERMINISTIC")
+        if not actual_pruning:
+            codes.append("C3_FAIL_NO_SENSITIVITY")
         if not smooth:
             codes.append("C3_FAIL_TOPOLOGY_INSTABILITY")
 
         status = PASS if not codes else "FAIL"
-        details = "C3 gate sensitivity pruning is structured and deterministic." if not codes else "C3 gate sensitivity checks failed."
+        details = (
+            "C3 thresholds produce deterministic, monotonic, non-vacuous pruning."
+            if not codes
+            else "C3 gate-sensitivity checks failed."
+        )
         return {
             "status": status,
             "details": details,
@@ -67,6 +77,11 @@ def run(test_config: dict, out_dir: Path) -> dict:
                 "survivors_baseline": n_base,
                 "survivors_looser": n_loose,
                 "survivors_baseline_rerun": n_base_2,
+                "gamma_steps": grid_n,
+                "actual_pruning": actual_pruning,
+                "jump_fraction_tight_to_base": jump_tight_to_base,
+                "jump_fraction_base_to_loose": jump_base_to_loose,
+                "max_topology_jump_fraction": max_jump_fraction,
                 "thresholds": {
                     "tighter": tighter,
                     "baseline": baseline,
@@ -78,8 +93,8 @@ def run(test_config: dict, out_dir: Path) -> dict:
                 str(r_tight["summary_json"].relative_to(out_dir).as_posix()),
                 str(r_base["summary_json"].relative_to(out_dir).as_posix()),
                 str(r_loose["summary_json"].relative_to(out_dir).as_posix()),
+                str(r_base_2["summary_json"].relative_to(out_dir).as_posix()),
             ],
         }
 
     return guard_run(_impl, "C3_FAIL_TOPOLOGY_INSTABILITY")
-
