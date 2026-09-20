@@ -2,7 +2,7 @@
 
 ## Constraint-Unified Residual Validator
 
-**NEWGR** (CURV) is a *gravity-theory evaluation and evidence-trail framework* that: (1) tests GR/PPN/Yukawa-like models against deflection/weak-field constraints, (2) evaluates UAP behavior claims against conservation laws and unavoidable signatures, (3) enforces an append-only, auditable gate system for all runs and artifacts. See [Program Purpose](docs/PROGRAM_PURPOSE.md) for the canonical definition and three-lane architecture.
+**CURV** is a *constraint-driven physics evaluation and evidence-trail framework* that: (1) tests GR/PPN/Yukawa-like models against deflection/weak-field constraints, (2) evaluates UAP behavior claims against conservation laws and unavoidable signatures, (3) evaluates exotic/source plausibility under explicit assumptions, and (4) can act as a read-only research-readiness validator for Universal Frequency Spectrum frontier/question records. See [Program Purpose](docs/PROGRAM_PURPOSE.md) for the canonical definition and four research lanes.
 
 CURV does not generate new physics.
 It eliminates inconsistent deviations.
@@ -18,7 +18,7 @@ Structural rules are versioned and frozen unless explicitly revised.
 * **What CURV is:** a reproducible, falsifier-first instrument for constraint-based gravity deviation testing.
 * **What CURV is not:** evidence of new physics, propulsion claims, or anomaly interpretation.
 * **Reproduce certification:** `python certification/run_certification.py`
-* **Certified tags:** `v0.1.0-certified` (original Tier-1 anchor), `v0.1.1-certified` (publication-clean baseline with tests + docs).
+* **Certified tags:** `v0.1.0-certified` (original Tier-1 anchor), `v0.1.1-certified` (publication-clean gravity-core baseline). These tags are historical certified snapshots; current `main` includes later console/UFS integration work and must be judged by current CI/certification results rather than inheriting a tag's certification.
 * **Instrument Console (local UI):** see [console/README.md](console/README.md) — evidence-first lab console over registries and scripts.
 * **Universal Frequency Spectrum bridge:** the console can read a sibling/configured UFS canonical dataset and run structural-readiness validation without modifying UFS. See [docs/UFS_INTEGRATION.md](docs/UFS_INTEGRATION.md).
 
@@ -391,7 +391,7 @@ Constraint precedes curiosity.
 
 | Doc | Purpose |
 |-----|---------|
-| `docs/PROGRAM_PURPOSE.md` | **Canonical program definition**, three lanes, breakthrough semantics |
+| `docs/PROGRAM_PURPOSE.md` | **Canonical program definition**, four research lanes, breakthrough semantics |
 | `docs/REGISTRY_MAP.md` | Registry paths, writer scripts, row schemas |
 | `docs/UFS_INTEGRATION.md` | Read-only UFS bridge and research-readiness validator contract |
 | `WHITEPAPER.md` | Formal framing |
