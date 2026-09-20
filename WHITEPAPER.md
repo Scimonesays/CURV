@@ -4,6 +4,8 @@
 
 ### A Deterministic Framework for Gravitational Deviation Constraint
 
+> **Scope note:** This whitepaper documents CURV's gravity-core certified baseline. The current repository has since added claim-evaluation, exotic-feasibility, local-console, and UFS research-validation capabilities. Those additions do not retroactively change the frozen gravity baseline described here; see [docs/PROGRAM_PURPOSE.md](docs/PROGRAM_PURPOSE.md) for current scope.
+
 ---
 
 ## Abstract
