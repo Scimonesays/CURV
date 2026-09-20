@@ -13,6 +13,7 @@ import {
   Status,
   Survivorship,
   TimelineEvent,
+  UfsOverview,
   View,
   artifactUrl,
   cancelJob,
@@ -28,6 +29,7 @@ import {
   fetchRun,
   fetchSurvivorship,
   fetchTimeline,
+  fetchUfsOverview,
 } from "./api";
 import { StatusToken } from "./components/StatusToken";
 
@@ -37,6 +39,7 @@ const DEFAULT_REG: Record<Lane, string> = {
   theory: "results_registry",
   claims: "ufo_observable_registry",
   exotic: "exotic_tripwire_registry",
+  ufs: "ufs_validation_registry",
   certification: "",
 };
 
@@ -65,6 +68,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [jsonPreview, setJsonPreview] = useState<string>("");
+  const [ufsOverview, setUfsOverview] = useState<UfsOverview | null>(null);
 
   const refreshChrome = useCallback(async () => {
     const [id, lanes, tl, cert] = await Promise.all([
@@ -104,7 +108,7 @@ export default function App() {
   useEffect(() => {
     const next = DEFAULT_REG[lane];
     setRegistryName(next);
-    setView(lane === "certification" ? "certification" : "evidence");
+    setView(lane === "certification" ? "certification" : lane === "ufs" ? "ufs" : "evidence");
     if (lane !== "certification") {
       loadRegistry(next).catch((e) => setError(String(e)));
     }
@@ -138,6 +142,11 @@ export default function App() {
       fetchArtifactScan()
         .then((d) => setAtlasDirs(d.dirs))
         .catch(() => undefined);
+    }
+    if (lane === "ufs") {
+      fetchUfsOverview()
+        .then(setUfsOverview)
+        .catch((e) => setError(String(e)));
     }
   }, [lane, loadRegistry]);
 
@@ -252,6 +261,7 @@ export default function App() {
     { id: "scorecard", label: "Scorecard", show: lane === "claims" },
     { id: "ladder", label: "Ladder", show: lane === "claims" },
     { id: "atlas", label: "Atlas", show: lane === "exotic" },
+    { id: "ufs", label: "UFS Workspace", show: lane === "ufs" },
     { id: "certification", label: "Certification", show: lane === "certification" },
   ];
 
@@ -331,6 +341,7 @@ export default function App() {
               ["theory", "Theory"],
               ["claims", "Claims"],
               ["exotic", "Exotic"],
+              ["ufs", "UFS"],
               ["certification", "Certification"],
             ] as [Lane, string][]
           ).map(([id, label]) => (
@@ -433,6 +444,17 @@ export default function App() {
                   .then((d) => setAtlasDirs(d.dirs))
                   .catch((e) => setError(String(e)))
               }
+            />
+          )}
+
+          {view === "ufs" && (
+            <UfsView
+              data={ufsOverview}
+              onValidate={(recordId) => {
+                setLaunchId("ufs_candidate_validation");
+                setLaunchParams({ record_id: recordId, ufs_repo: "", notes: "" });
+                setView("launch");
+              }}
             />
           )}
 
@@ -886,6 +908,65 @@ function AtlasView(props: {
         ))}
       </ul>
       {props.dirs.length === 0 && <div className="empty">No artifact directories</div>}
+    </div>
+  );
+}
+
+function UfsView(props: { data: UfsOverview | null; onValidate: (recordId: string) => void }) {
+  if (!props.data) return <div className="empty">Loading Universal Frequency Spectrum…</div>;
+  if (!props.data.connected) {
+    return (
+      <div>
+        <h2>Universal Frequency Spectrum</h2>
+        <div className="banner-spec">{props.data.error || "UFS repository not connected"}</div>
+        <p className="muted">Set UFS_REPO_PATH or clone Universal-Frequency-Spectrum beside CURV.</p>
+      </div>
+    );
+  }
+  const counts = props.data.manifest?.counts || {};
+  return (
+    <div>
+      <h2>Universal Frequency Spectrum</h2>
+      <p className="muted">Read-only canonical workspace. CURV validates research readiness; UFS keeps scientific authority.</p>
+      <div className="gate-list">
+        <div className="gate-row"><span>Canonical schema</span><span className="mono">{props.data.manifest?.schema_version || "—"}</span></div>
+        <div className="gate-row"><span>Phenomena</span><span className="mono">{counts.phenomena ?? 0}</span></div>
+        <div className="gate-row"><span>Interactions</span><span className="mono">{counts.interactions ?? 0}</span></div>
+        <div className="gate-row"><span>Frontier / questions</span><span className="mono">{counts.frontier ?? 0}</span></div>
+        <div className="gate-row"><span>Gaps</span><span className="mono">{counts.gaps ?? 0}</span></div>
+      </div>
+      <hr className="hairline" />
+      <h3>Frontier / question nodes</h3>
+      <table className="registry">
+        <thead><tr><th>ID</th><th>Name</th><th>Status</th><th>Domain</th><th>Action</th></tr></thead>
+        <tbody>
+          {props.data.frontier.map((r) => (
+            <tr key={r.id}>
+              <td className="mono">{r.id}</td>
+              <td>{r.name}</td>
+              <td>{r.status}</td>
+              <td>{r.domain}</td>
+              <td><button type="button" onClick={() => props.onValidate(r.id)}>Validate readiness</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <hr className="hairline" />
+      <h3>Typed gaps</h3>
+      <table className="registry">
+        <thead><tr><th>ID</th><th>Type</th><th>Name</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+          {props.data.gaps.map((g) => (
+            <tr key={g.id}>
+              <td className="mono">{g.id}</td>
+              <td>{g.type}</td>
+              <td>{g.name}</td>
+              <td>{g.status}</td>
+              <td><button type="button" onClick={() => props.onValidate(g.id)}>Validate readiness</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
