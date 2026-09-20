@@ -18,6 +18,7 @@ from .launch_catalog import build_argv, list_catalog
 from .paths import JOBS_DIR, REPO_ROOT, ensure_dirs
 
 _jobs: dict[str, dict[str, Any]] = {}
+_processes: dict[str, subprocess.Popen[str]] = {}
 _lock = threading.Lock()
 
 
@@ -88,6 +89,7 @@ def create_job(
         "log_path": str(JOBS_DIR / f"{job_id}.log"),
         "log_tail": "",
         "error": None,
+        "cancel_requested": False,
     }
     with _lock:
         _jobs[job_id] = job
@@ -100,6 +102,12 @@ def create_job(
 def _run_job(job_id: str) -> None:
     with _lock:
         job = _jobs[job_id]
+        if job.get("cancel_requested"):
+            job["status"] = "CANCELLED"
+            job["finished_utc"] = _utc_now()
+            _jobs[job_id] = job
+            _persist(job)
+            return
     log_path = Path(job["log_path"])
     job["status"] = "RUNNING"
     job["started_utc"] = _utc_now()
@@ -118,6 +126,7 @@ def _run_job(job_id: str) -> None:
             )
             with _lock:
                 job["pid"] = proc.pid
+                _processes[job_id] = proc
                 _jobs[job_id] = job
             assert proc.stdout is not None
             for line in proc.stdout:
@@ -130,8 +139,16 @@ def _run_job(job_id: str) -> None:
                         job["run_id"] = m.group(1)
                     _jobs[job_id] = job
             code = proc.wait()
+        with _lock:
+            latest = _jobs.get(job_id, job)
+            cancelled = bool(latest.get("cancel_requested"))
         job["exit_code"] = code
-        job["status"] = "PASS" if code == 0 else "FAIL"
+        if cancelled:
+            job["cancel_requested"] = True
+            job["status"] = "CANCELLED"
+            job["error"] = "cancelled"
+        else:
+            job["status"] = "PASS" if code == 0 else "FAIL"
     except Exception as exc:
         job["status"] = "FAIL"
         job["error"] = str(exc)
@@ -144,6 +161,7 @@ def _run_job(job_id: str) -> None:
         if not job.get("run_id"):
             job["run_id"] = _infer_run_id_from_log(log_path)
         with _lock:
+            _processes.pop(job_id, None)
             _jobs[job_id] = job
         _persist(job)
 
@@ -183,11 +201,22 @@ def cancel_job(job_id: str) -> dict[str, Any]:
     job = get_job(job_id)
     if not job:
         raise KeyError(job_id)
-    if job.get("status") != "RUNNING":
+    if job.get("status") in {"PASS", "FAIL", "CANCELLED"}:
         return job
-    pid = job.get("pid")
-    if pid:
-        try:
+
+    job["cancel_requested"] = True
+    job["status"] = "CANCELLING"
+    job["error"] = "cancellation requested"
+    with _lock:
+        _jobs[job_id] = job
+        proc = _processes.get(job_id)
+    _persist(job)
+
+    try:
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
+        elif job.get("pid"):
+            pid = int(job["pid"])
             if sys.platform == "win32":
                 subprocess.run(["taskkill", "/PID", str(pid), "/F", "/T"], check=False, capture_output=True)
             else:
@@ -195,14 +224,13 @@ def cancel_job(job_id: str) -> dict[str, Any]:
                 import signal
 
                 os.kill(pid, signal.SIGTERM)
-        except Exception as exc:
-            job["error"] = f"cancel failed: {exc}"
-    job["status"] = "FAIL"
-    job["error"] = (job.get("error") or "") + " cancelled"
-    job["finished_utc"] = _utc_now()
-    with _lock:
-        _jobs[job_id] = job
-    _persist(job)
+    except ProcessLookupError:
+        pass
+    except Exception as exc:
+        job["error"] = f"cancel failed: {exc}"
+        with _lock:
+            _jobs[job_id] = job
+        _persist(job)
     return job
 
 
@@ -223,7 +251,7 @@ def iter_log_sse(job_id: str) -> Iterator[str]:
             if chunk:
                 yield f"data: {json.dumps({'chunk': chunk, 'status': job.get('status')})}\n\n"
         status = job.get("status")
-        if status in ("PASS", "FAIL") and (not path.exists() or offset >= path.stat().st_size):
+        if status in ("PASS", "FAIL", "CANCELLED") and (not path.exists() or offset >= path.stat().st_size):
             yield f"data: {json.dumps({'done': True, 'job': job})}\n\n"
             break
         time.sleep(0.4)
