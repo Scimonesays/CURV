@@ -29,6 +29,7 @@ from src.results_registry import (
     make_run_id,
     utc_now_iso,
 )
+from src.exotic_tripwire import ExoticTripwire, ExoticTripwireEvalConfig
 from src.theories.gr_schwarzschild import GRSchwarzschild
 from src.theories.gr_yukawa_deviation import GRYukawaDeviation
 from src.utils_plot import apply_default_style, save_figure
@@ -166,7 +167,7 @@ def _tail_sign_diagnostics(
     }
 
 
-def _compute_window_baseline(*, window: tuple[float, float], n_points: int, h: float) -> float:
+def _compute_window_baseline(*, window: tuple[float, float], n_points: int, h: float, max_steps: int) -> float:
     """
     Compute known-limit agreement metric for the Yukawa family.
 
@@ -174,7 +175,7 @@ def _compute_window_baseline(*, window: tuple[float, float], n_points: int, h: f
     """
     theory_limit = GRYukawaDeviation(alpha_y=0.0, lambda_y_over_m=50.0)
     theory_gr = GRSchwarzschild(mass=1.0)
-    setup_h = {"h": float(h)}
+    setup_h = {"h": float(h), "max_steps": int(max_steps)}
     _, alpha_limit, _, _ = compute_deflection_curve(
         theory_limit,
         bmin_over_m=window[0],
@@ -197,6 +198,7 @@ def _compute_numeric_wf_baseline(
     window: tuple[float, float],
     n_points: int,
     h: float,
+    max_steps: int,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Compute cached numeric GR baseline for weak-field reference mode."""
     theory_gr = GRSchwarzschild(mass=1.0)
@@ -205,7 +207,7 @@ def _compute_numeric_wf_baseline(
         bmin_over_m=window[0],
         bmax_over_m=window[1],
         n_points=n_points,
-        setup={"h": float(h)},
+        setup={"h": float(h), "max_steps": int(max_steps)},
     )
     return b, alpha_gr
 
@@ -221,6 +223,7 @@ def _compute_point_metrics(
     window: tuple[float, float],
     n_points: int,
     h: float,
+    max_steps: int,
     known_limit_mean_rel_err: float,
     tail_eps_abs: float,
     tail_eps_rel: float,
@@ -232,10 +235,10 @@ def _compute_point_metrics(
     wf_eps_denom: float,
     numeric_wf_alpha_ref: np.ndarray | None,
 ) -> dict[str, Any]:
-    setup_h = {"h": float(h)}
-    setup_h2 = {"h": float(h) / 2.0}
+    setup_h = {"h": float(h), "max_steps": int(max_steps)}
+    setup_h2 = {"h": float(h) / 2.0, "max_steps": int(max_steps)}
     theory = GRYukawaDeviation(alpha_y=float(alpha_y), lambda_y_over_m=float(lambda_y_over_m))
-    _, alpha_h, alpha_ref, rel_err_h = compute_deflection_curve(
+    b, alpha_h, alpha_ref, rel_err_h = compute_deflection_curve(
         theory,
         bmin_over_m=window[0],
         bmax_over_m=window[1],
@@ -268,7 +271,9 @@ def _compute_point_metrics(
         tail_sign_alpha=tail_sign_alpha,
     )
     return {
+        "b_over_m": b,
         "alpha_h": alpha_h,
+        "alpha_ref": alpha_ref,
         "alpha_h2": alpha_h2,
         "rel_err_h": rel_err_h,
         "known_limit_mean_rel_err": float(known_limit_mean_rel_err),
@@ -355,6 +360,7 @@ def run_yukawa_sweep(
     range_windows: list[tuple[float, float]],
     n_points: int,
     h: float,
+    max_steps: int = 36_000,
     source_pass_flag: str = "na",
     curvature_pass_flag: str = "na",
     external_alignment_trigger: bool = False,
@@ -370,6 +376,7 @@ def run_yukawa_sweep(
     notes: str = "",
     mirror_jsonl: bool = True,
     plots: bool = True,
+    use_exotic_tripwire_gate: bool = False,
 ) -> dict[str, Any]:
     if alpha_max < alpha_min:
         raise ValueError("alpha_max must be >= alpha_min.")
@@ -424,19 +431,31 @@ def run_yukawa_sweep(
     wf_numeric_ref_by_window: dict[str, np.ndarray] = {}
     wf_ref_baseline: dict[str, dict[str, Any]] = {}
     failure_reason_counts: dict[str, int] = {}
+    exotic_point_rows: list[dict[str, Any]] = []
 
     best_param_key: tuple[str, str] | None = None
     best_score = float("inf")
 
     for window in range_windows:
         window_tag = f"{window[0]:.6g}:{window[1]:.6g}"
-        known_limit_by_window[window_tag] = _compute_window_baseline(window=window, n_points=n_points, h=h)
+        known_limit_by_window[window_tag] = _compute_window_baseline(
+            window=window,
+            n_points=n_points,
+            h=h,
+            max_steps=int(max_steps),
+        )
         if str(wf_ref_mode) == "numeric":
-            b_ref, alpha_gr_ref = _compute_numeric_wf_baseline(window=window, n_points=n_points, h=h)
+            b_ref, alpha_gr_ref = _compute_numeric_wf_baseline(
+                window=window,
+                n_points=n_points,
+                h=h,
+                max_steps=int(max_steps),
+            )
             wf_numeric_ref_by_window[window_tag] = alpha_gr_ref
             wf_ref_baseline[window_tag] = {
                 "theory": "gr_schwarzschild",
                 "h": float(h),
+                "max_steps": int(max_steps),
                 "n_points": int(n_points),
                 "range_window": [float(window[0]), float(window[1])],
                 "grid_signature": _grid_signature(b_ref),
@@ -451,6 +470,7 @@ def run_yukawa_sweep(
                     window=window,
                     n_points=int(n_points),
                     h=float(h),
+                    max_steps=int(max_steps),
                     known_limit_mean_rel_err=float(known_limit_by_window[window_tag]),
                     tail_eps_abs=float(tail_eps_abs),
                     tail_eps_rel=float(tail_eps_rel),
@@ -482,6 +502,12 @@ def run_yukawa_sweep(
                         known_limit_thresh=KL_THRESHOLD,
                     )
                     pass_flag = 1.0 if bool(gate["gate0_pass"]) else 0.0
+                    exotic = ExoticTripwire.evaluate_from_curves(
+                        b_over_m=np.asarray(m["b_over_m"], dtype=float),
+                        alpha_model=np.asarray(m["alpha_h"], dtype=float),
+                        alpha_ref=np.asarray(m["alpha_ref"], dtype=float),
+                        config=ExoticTripwireEvalConfig(b_window=(float(window[0]), float(window[1]))),
+                    )
                     key = (wf_key, window_tag, alpha_key, lambda_key)
                     records[key] = {
                         "wf_key": wf_key,
@@ -498,8 +524,18 @@ def run_yukawa_sweep(
                         "tail_sign_changes_sig": m["tail_sign_changes_sig"],
                         "tail_n_significant": m["tail_n_significant"],
                         "tail_anatomy": m["tail_anatomy"],
+                        "exotic_tripwire": exotic,
                         "pass_flag": pass_flag,
                     }
+                    exotic_point_rows.append(
+                        {
+                            "wf_key": wf_key,
+                            "window": window_tag,
+                            "alpha_y": float(alpha_y),
+                            "lambda_y_over_m": float(lam),
+                            **exotic,
+                        }
+                    )
                     all_rows.append(
                         [
                             float(wf_thresh),
@@ -527,6 +563,11 @@ def run_yukawa_sweep(
                             1.0 if bool(gate["gate0_resolution_pass"]) else 0.0,
                             1.0 if bool(gate["gate0_known_limit_pass"]) else 0.0,
                             pass_flag,
+                            float(exotic.get("exoticity_score", float("nan"))),
+                            1.0 if bool(exotic.get("wec_tripwire", False)) else 0.0,
+                            1.0 if bool(exotic.get("nec_tripwire", False)) else 0.0,
+                            1.0 if bool(exotic.get("scaling_tripwire", False)) else 0.0,
+                            float(exotic.get("scaling_power_p", float("nan"))),
                         ]
                     )
                     if not bool(gate["gate0_weak_field_pass"]):
@@ -582,7 +623,8 @@ def run_yukawa_sweep(
             "known_limit_mean_rel_err,tail_median_residual,endpoint_ratio,sign_changes,"
             "tail_sign_changes_sig,tail_n_significant,tail_sign_consistent,"
             "tail_sign_detectable,tail_sign_balance,tail_sign_p_two,"
-            "weak_field_pass,resolution_pass,known_limit_pass,gate0_pass"
+            "weak_field_pass,resolution_pass,known_limit_pass,gate0_pass,"
+            "exoticity_score,wec_tripwire,nec_tripwire,scaling_tripwire,scaling_power_p"
         ),
         comments="",
     )
@@ -731,6 +773,13 @@ def run_yukawa_sweep(
         ),
         "low_perturbation_variance": bool(perturb_tail_std <= 1.0e-3),
     }
+    exotic_reference = {"status": "FAILED", "tripwire_pass": False}
+    if best_param_key is not None and (strictest_key, primary_tag, best_param_key[0], best_param_key[1]) in records:
+        exotic_reference = dict(records[(strictest_key, primary_tag, best_param_key[0], best_param_key[1])]["exotic_tripwire"])
+    if bool(use_exotic_tripwire_gate):
+        strong_checks["exotic_tripwire_gate_pass"] = bool(
+            str(exotic_reference.get("status", "FAILED")) == "OK" and bool(exotic_reference.get("tripwire_pass", False))
+        )
 
     def _flag_pass(flag: str) -> bool:
         val = str(flag).lower()
@@ -781,6 +830,80 @@ def run_yukawa_sweep(
         },
     )
 
+    exotic_ok = [r for r in exotic_point_rows if str(r.get("status", "FAILED")) == "OK"]
+    exotic_failed = [r for r in exotic_point_rows if str(r.get("status", "FAILED")) != "OK"]
+    top_exotic = sorted(
+        exotic_ok,
+        key=lambda row: float(row.get("exoticity_score", float("-inf"))),
+        reverse=True,
+    )[:10]
+    failure_codes: dict[str, int] = {}
+    for row_fail in exotic_failed:
+        code = str(row_fail.get("failure_code", "unknown"))
+        failure_codes[code] = failure_codes.get(code, 0) + 1
+    exotic_summary = {
+        "status": str(exotic_reference.get("status", "FAILED")),
+        "tripwire_pass": bool(exotic_reference.get("tripwire_pass", False)),
+        "wec_tripwire": bool(exotic_reference.get("wec_tripwire", False)),
+        "nec_tripwire": bool(exotic_reference.get("nec_tripwire", False)),
+        "scaling_tripwire": bool(exotic_reference.get("scaling_tripwire", False)),
+        "exoticity_score": float(exotic_reference.get("exoticity_score", float("nan"))),
+        "rho_proxy_min": float(exotic_reference.get("rho_proxy_min", float("nan"))),
+        "nec_proxy_min": float(exotic_reference.get("nec_proxy_min", float("nan"))),
+        "scaling_power_p": float(exotic_reference.get("scaling_power_p", float("nan"))),
+        "atlas": {
+            "tripwire_pass_count": int(sum(1 for r in exotic_ok if bool(r.get("tripwire_pass", False)))),
+            "tripwire_fail_count": int(sum(1 for r in exotic_ok if not bool(r.get("tripwire_pass", False)))),
+            "failed_eval_count": int(len(exotic_failed)),
+            "failure_codes": dict(sorted(failure_codes.items())),
+            "top10_most_exotic": [
+                {
+                    "wf_thresh": str(r["wf_key"]),
+                    "window": str(r["window"]),
+                    "alpha_y": float(r["alpha_y"]),
+                    "lambda_y_over_m": float(r["lambda_y_over_m"]),
+                    "exoticity_score": float(r["exoticity_score"]),
+                    "tripwire_pass": bool(r["tripwire_pass"]),
+                }
+                for r in top_exotic
+            ],
+        },
+        "gate_enabled": bool(use_exotic_tripwire_gate),
+    }
+    atlas_rows: list[list[str | float | int]] = []
+    for r in top_exotic:
+        atlas_rows.append(
+            [
+                str(r["wf_key"]),
+                str(r["window"]),
+                float(r["alpha_y"]),
+                float(r["lambda_y_over_m"]),
+                str(r["status"]),
+                int(1 if bool(r["tripwire_pass"]) else 0),
+                float(r.get("exoticity_score", float("nan"))),
+                int(1 if bool(r.get("wec_tripwire", False)) else 0),
+                int(1 if bool(r.get("nec_tripwire", False)) else 0),
+                int(1 if bool(r.get("scaling_tripwire", False)) else 0),
+                float(r.get("scaling_power_p", float("nan"))),
+                str(r.get("failure_code", "NA")),
+            ]
+        )
+    atlas_path = metrics_dir / f"{run_id}_exotic_tripwire_atlas.csv"
+    atlas_arr = np.array(atlas_rows, dtype=object) if atlas_rows else np.empty((0, 12), dtype=object)
+    np.savetxt(
+        atlas_path,
+        atlas_arr,
+        delimiter=",",
+        fmt="%s",
+        header=(
+            "wf_thresh,window,alpha_y,lambda_y_over_m,status,tripwire_pass,exoticity_score,wec_tripwire,nec_tripwire,"
+            "scaling_tripwire,scaling_power_p,failure_code"
+        ),
+        comments="",
+    )
+    promotion["metadata"] = dict(promotion.get("metadata", {}))
+    promotion["metadata"]["exotic_tripwire"] = exotic_summary
+
     summary = {
         "run_id": run_id,
         "wf_thresh_seq": [float(x) for x in wf_thresh_seq],
@@ -794,6 +917,7 @@ def run_yukawa_sweep(
         "range_windows": [[float(w[0]), float(w[1])] for w in range_windows],
         "n_points": int(n_points),
         "h": float(h),
+        "max_steps": int(max_steps),
         "n_grid_rows": int(len(all_rows)),
         "survivors_by_thresh": survivors_by_thresh,
         "survivors_by_thresh_window": survivors_by_thresh_window,
@@ -810,6 +934,7 @@ def run_yukawa_sweep(
         "wf_ref_mode": str(wf_ref_mode),
         "wf_ref_baseline": wf_ref_baseline if str(wf_ref_mode) == "numeric" else "NA",
         "plots_enabled": bool(plots),
+        "exotic_tripwire": exotic_summary,
     }
     (raw_dir / f"{run_id}_yukawa_sweep_summary.json").write_text(
         json.dumps(summary, indent=2, ensure_ascii=True), encoding="utf-8"
@@ -822,6 +947,7 @@ def run_yukawa_sweep(
     artifacts = [
         rel(metrics_dir / f"{run_id}_yukawa_sweep_results.csv"),
         rel(metrics_dir / f"{run_id}_yukawa_survivors.csv"),
+        rel(atlas_path),
         rel(raw_dir / f"{run_id}_yukawa_sweep_summary.json"),
         rel(raw_dir / f"{run_id}_promotion_eval.json"),
     ]
@@ -891,6 +1017,7 @@ def main() -> None:
     parser.add_argument("--range-windows", default="50:500,100:1000")
     parser.add_argument("--n-points", type=int, default=320)
     parser.add_argument("--h", type=float, default=0.18)
+    parser.add_argument("--max-steps", type=int, default=36000)
     parser.add_argument("--wf-ref-mode", choices=["analytic", "numeric"], default="numeric")
     parser.add_argument("--wf-eps-denom", type=float, default=1.0e-15)
     parser.add_argument("--source-pass-flag", choices=["na", "pass", "fail"], default="na")
@@ -906,6 +1033,11 @@ def main() -> None:
     parser.add_argument("--notes", default="")
     parser.add_argument("--no-jsonl", action="store_true")
     parser.add_argument("--no-plots", action="store_true")
+    parser.add_argument(
+        "--use-exotic-tripwire-gate",
+        action="store_true",
+        help="Use exotic tripwire as an additional promotion gate (default: annotation only).",
+    )
     args = parser.parse_args()
     _ = args.theory
 
@@ -922,6 +1054,7 @@ def main() -> None:
         range_windows=_parse_range_windows(args.range_windows),
         n_points=int(args.n_points),
         h=float(args.h),
+        max_steps=int(args.max_steps),
         wf_ref_mode=str(args.wf_ref_mode),
         wf_eps_denom=float(args.wf_eps_denom),
         source_pass_flag=str(args.source_pass_flag),
@@ -937,6 +1070,7 @@ def main() -> None:
         notes=args.notes,
         mirror_jsonl=not bool(args.no_jsonl),
         plots=not bool(args.no_plots),
+        use_exotic_tripwire_gate=bool(args.use_exotic_tripwire_gate),
     )
     print("yukawa_sweep complete")
     print(f"run_id={row['run_id']}")

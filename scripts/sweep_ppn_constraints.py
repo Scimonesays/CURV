@@ -28,6 +28,7 @@ from src.results_registry import (
     make_run_id,
     utc_now_iso,
 )
+from src.exotic_tripwire import ExoticTripwire, ExoticTripwireEvalConfig
 from src.theories.gr_ppn_screened_potential import GRPPNScreenedPotential
 from src.theories.gr_schwarzschild import GRSchwarzschild
 
@@ -232,7 +233,7 @@ def _compute_gamma_metrics(
     setup_h = {"h": float(h)}
     setup_h2 = {"h": float(h) / 2.0}
     theory = GRPPNScreenedPotential(gamma_ppn=float(gamma))
-    _, alpha_h, alpha_ref, rel_err_h = compute_deflection_curve(
+    b, alpha_h, alpha_ref, rel_err_h = compute_deflection_curve(
         theory,
         bmin_over_m=window[0],
         bmax_over_m=window[1],
@@ -262,7 +263,9 @@ def _compute_gamma_metrics(
         tail_sign_alpha=tail_sign_alpha,
     )
     return float(gamma), {
+        "b_over_m": b,
         "alpha_h": alpha_h,
+        "alpha_ref": alpha_ref,
         "alpha_h2": alpha_h2,
         "rel_err_h": rel_err_h,
         "known_limit_mean_rel_err": float(known_limit_mean_rel_err),
@@ -312,6 +315,7 @@ def run_ppn_sweep(
     telemetry_seconds: float = 2.0,
     max_workers: int | None = None,
     plots: bool = False,
+    use_exotic_tripwire_gate: bool = False,
 ) -> dict[str, Any]:
     if str(wf_ref_mode) not in ("analytic", "numeric"):
         raise ValueError(f"Unsupported wf_ref_mode: {wf_ref_mode}")
@@ -362,6 +366,7 @@ def run_ppn_sweep(
     total_steps = (len(range_windows) * len(gamma_values)) + (len(wf_thresh_seq) * len(range_windows) * len(gamma_values))
     completed_steps = 0
     promotion_hint = "pending"
+    exotic_point_rows: list[dict[str, Any]] = []
 
     def emit_telemetry(*, wf_label: str) -> None:
         nonlocal last_telemetry
@@ -466,6 +471,12 @@ def run_ppn_sweep(
                     known_limit_thresh=KL_THRESHOLD,
                 )
                 pass_flag = 1.0 if bool(gate["gate0_pass"]) else 0.0
+                exotic = ExoticTripwire.evaluate_from_curves(
+                    b_over_m=np.asarray(m["b_over_m"], dtype=float),
+                    alpha_model=np.asarray(m["alpha_h"], dtype=float),
+                    alpha_ref=np.asarray(m["alpha_ref"], dtype=float),
+                    config=ExoticTripwireEvalConfig(b_window=(float(window[0]), float(window[1]))),
+                )
                 key = (wf_key, window_tag, float(gamma))
                 records[key] = {
                     "wf_key": wf_key,
@@ -481,8 +492,17 @@ def run_ppn_sweep(
                     "tail_sign_changes_sig": m["tail_sign_changes_sig"],
                     "tail_n_significant": m["tail_n_significant"],
                     "tail_anatomy": m["tail_anatomy"],
+                    "exotic_tripwire": exotic,
                     "pass_flag": pass_flag,
                 }
+                exotic_point_rows.append(
+                    {
+                        "wf_key": wf_key,
+                        "window": window_tag,
+                        "gamma_ppn": float(gamma),
+                        **exotic,
+                    }
+                )
                 all_rows.append(
                     [
                         float(wf_thresh),
@@ -509,6 +529,11 @@ def run_ppn_sweep(
                         1.0 if bool(gate["gate0_resolution_pass"]) else 0.0,
                         1.0 if bool(gate["gate0_known_limit_pass"]) else 0.0,
                         pass_flag,
+                        float(exotic.get("exoticity_score", float("nan"))),
+                        1.0 if bool(exotic.get("wec_tripwire", False)) else 0.0,
+                        1.0 if bool(exotic.get("nec_tripwire", False)) else 0.0,
+                        1.0 if bool(exotic.get("scaling_tripwire", False)) else 0.0,
+                        float(exotic.get("scaling_power_p", float("nan"))),
                     ]
                 )
                 if pass_flag >= 0.5:
@@ -546,7 +571,8 @@ def run_ppn_sweep(
             "known_limit_mean_rel_err,tail_median_residual,endpoint_ratio,sign_changes,"
             "tail_sign_changes_sig,tail_n_significant,tail_sign_consistent,"
             "tail_sign_detectable,tail_sign_balance,tail_sign_p_two,"
-            "weak_field_pass,resolution_pass,known_limit_pass,gate0_pass"
+            "weak_field_pass,resolution_pass,known_limit_pass,gate0_pass,"
+            "exoticity_score,wec_tripwire,nec_tripwire,scaling_tripwire,scaling_power_p"
         ),
         comments="",
     )
@@ -673,6 +699,13 @@ def run_ppn_sweep(
         ) else False,
         "low_perturbation_variance": bool(perturb_tail_std <= 1.0e-3),
     }
+    exotic_reference = {"status": "FAILED", "tripwire_pass": False}
+    if best_gamma is not None and (strictest_key, primary_tag, float(best_gamma)) in records:
+        exotic_reference = dict(records[(strictest_key, primary_tag, float(best_gamma))]["exotic_tripwire"])
+    if bool(use_exotic_tripwire_gate):
+        strong_checks["exotic_tripwire_gate_pass"] = bool(
+            str(exotic_reference.get("status", "FAILED")) == "OK" and bool(exotic_reference.get("tripwire_pass", False))
+        )
 
     def _flag_pass(flag: str) -> bool:
         val = str(flag).lower()
@@ -720,6 +753,78 @@ def run_ppn_sweep(
         },
     )
 
+    exotic_ok = [r for r in exotic_point_rows if str(r.get("status", "FAILED")) == "OK"]
+    exotic_failed = [r for r in exotic_point_rows if str(r.get("status", "FAILED")) != "OK"]
+    top_exotic = sorted(
+        exotic_ok,
+        key=lambda row: float(row.get("exoticity_score", float("-inf"))),
+        reverse=True,
+    )[:10]
+    failure_codes: dict[str, int] = {}
+    for row_fail in exotic_failed:
+        code = str(row_fail.get("failure_code", "unknown"))
+        failure_codes[code] = failure_codes.get(code, 0) + 1
+    exotic_summary = {
+        "status": str(exotic_reference.get("status", "FAILED")),
+        "tripwire_pass": bool(exotic_reference.get("tripwire_pass", False)),
+        "wec_tripwire": bool(exotic_reference.get("wec_tripwire", False)),
+        "nec_tripwire": bool(exotic_reference.get("nec_tripwire", False)),
+        "scaling_tripwire": bool(exotic_reference.get("scaling_tripwire", False)),
+        "exoticity_score": float(exotic_reference.get("exoticity_score", float("nan"))),
+        "rho_proxy_min": float(exotic_reference.get("rho_proxy_min", float("nan"))),
+        "nec_proxy_min": float(exotic_reference.get("nec_proxy_min", float("nan"))),
+        "scaling_power_p": float(exotic_reference.get("scaling_power_p", float("nan"))),
+        "atlas": {
+            "tripwire_pass_count": int(sum(1 for r in exotic_ok if bool(r.get("tripwire_pass", False)))),
+            "tripwire_fail_count": int(sum(1 for r in exotic_ok if not bool(r.get("tripwire_pass", False)))),
+            "failed_eval_count": int(len(exotic_failed)),
+            "failure_codes": dict(sorted(failure_codes.items())),
+            "top10_most_exotic": [
+                {
+                    "wf_thresh": str(r["wf_key"]),
+                    "window": str(r["window"]),
+                    "gamma_ppn": float(r["gamma_ppn"]),
+                    "exoticity_score": float(r["exoticity_score"]),
+                    "tripwire_pass": bool(r["tripwire_pass"]),
+                }
+                for r in top_exotic
+            ],
+        },
+        "gate_enabled": bool(use_exotic_tripwire_gate),
+    }
+    atlas_rows: list[list[str | float | int]] = []
+    for r in top_exotic:
+        atlas_rows.append(
+            [
+                str(r["wf_key"]),
+                str(r["window"]),
+                float(r["gamma_ppn"]),
+                str(r["status"]),
+                int(1 if bool(r["tripwire_pass"]) else 0),
+                float(r.get("exoticity_score", float("nan"))),
+                int(1 if bool(r.get("wec_tripwire", False)) else 0),
+                int(1 if bool(r.get("nec_tripwire", False)) else 0),
+                int(1 if bool(r.get("scaling_tripwire", False)) else 0),
+                float(r.get("scaling_power_p", float("nan"))),
+                str(r.get("failure_code", "NA")),
+            ]
+        )
+    atlas_path = metrics_dir / f"{run_id}_exotic_tripwire_atlas.csv"
+    atlas_arr = np.array(atlas_rows, dtype=object) if atlas_rows else np.empty((0, 11), dtype=object)
+    np.savetxt(
+        atlas_path,
+        atlas_arr,
+        delimiter=",",
+        fmt="%s",
+        header=(
+            "wf_thresh,window,gamma_ppn,status,tripwire_pass,exoticity_score,wec_tripwire,nec_tripwire,"
+            "scaling_tripwire,scaling_power_p,failure_code"
+        ),
+        comments="",
+    )
+    promotion["metadata"] = dict(promotion.get("metadata", {}))
+    promotion["metadata"]["exotic_tripwire"] = exotic_summary
+
     summary = {
         "run_id": run_id,
         "wf_thresh_seq": [float(x) for x in wf_thresh_seq],
@@ -746,6 +851,7 @@ def run_ppn_sweep(
         "parallel_workers": int(worker_count) if use_parallel and worker_count > 1 else 1,
         "telemetry_enabled": bool(telemetry_enabled),
         "plots_enabled": bool(plots),
+        "exotic_tripwire": exotic_summary,
     }
     (raw_dir / f"{run_id}_ppn_sweep_summary.json").write_text(
         json.dumps(summary, indent=2, ensure_ascii=True), encoding="utf-8"
@@ -758,6 +864,7 @@ def run_ppn_sweep(
     artifacts = [
         rel(metrics_dir / f"{run_id}_ppn_sweep_results.csv"),
         rel(metrics_dir / f"{run_id}_ppn_survivors.csv"),
+        rel(atlas_path),
         rel(raw_dir / f"{run_id}_ppn_sweep_summary.json"),
         rel(raw_dir / f"{run_id}_promotion_eval.json"),
     ]
@@ -887,6 +994,11 @@ def main() -> None:
         action="store_true",
         help="Enable post-run plotting hooks when available (no effect for current PPN sweep artifacts).",
     )
+    parser.add_argument(
+        "--use-exotic-tripwire-gate",
+        action="store_true",
+        help="Use exotic tripwire as an additional promotion gate (default: annotation only).",
+    )
     args = parser.parse_args()
     _ = args.theory
 
@@ -918,6 +1030,7 @@ def main() -> None:
         telemetry_seconds=float(args.telemetry_seconds),
         max_workers=int(args.max_workers) if args.max_workers is not None else None,
         plots=bool(args.plots),
+        use_exotic_tripwire_gate=bool(args.use_exotic_tripwire_gate),
     )
     print("ppn_sweep complete")
     print(f"run_id={row['run_id']}")

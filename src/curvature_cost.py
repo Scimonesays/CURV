@@ -6,8 +6,8 @@ import math
 import os
 from typing import Any
 
-C_LIGHT = 299792458.0
-G_NEWTON = 6.67430e-11
+from .coupling_scale_calibrator import C_LIGHT, calibrated_report_for_length
+
 M_EARTH_KG = 5.9722e24
 M_JUPITER_KG = 1.89813e27
 M_SUN_KG = 1.98847e30
@@ -35,15 +35,24 @@ def curvature_cost_sanity(
     geometry: str = "sphere",
     thickness_m: float | None = None,
 ) -> dict[str, Any]:
-    """Compute order-of-magnitude curvature cost scaling and triage gate."""
+    """Compute order-of-magnitude curvature cost scaling and triage gate.
+
+    For backward compatibility, legacy dimensional proxy values remain the default
+    for gate checks while EFE-calibrated values are always logged.
+    """
     if l_m <= 0.0:
         raise ValueError("L_m must be positive.")
     geom = str(geometry).lower()
     v_m3 = _volume_m3(l_m=float(l_m), geometry=geom, thickness_m=thickness_m)
 
-    rho_e = (C_LIGHT**4) / (G_NEWTON * (float(l_m) ** 2))
+    cal = calibrated_report_for_length(float(l_m))
+    rho_e_proxy = float(cal["rho_e_dimensional_proxy_j_per_m3"])
+    rho_e_efe = float(cal["rho_e_efe_calibrated_j_per_m3"])
+    rho_e = rho_e_proxy
     e_scale = rho_e * v_m3
     m_equiv = e_scale / (C_LIGHT**2)
+    e_scale_efe = rho_e_efe * v_m3
+    m_equiv_efe = e_scale_efe / (C_LIGHT**2)
 
     reasons: list[str] = []
     if rho_e > MAX_RHO_E_J_PER_M3:
@@ -58,12 +67,26 @@ def curvature_cost_sanity(
         "geometry": geom,
         "thickness_m": "NA" if thickness_m is None else float(thickness_m),
         "volume_m3": float(v_m3),
+        # Legacy proxy fields retained for stable downstream parsing.
         "rho_e_j_per_m3": float(rho_e),
         "E_scale_j": float(e_scale),
         "m_equiv_kg": float(m_equiv),
         "m_over_earth": float(m_equiv / M_EARTH_KG),
         "m_over_jupiter": float(m_equiv / M_JUPITER_KG),
         "m_over_sun": float(m_equiv / M_SUN_KG),
+        # Calibrated + explicit coupling diagnostics.
+        "K_target_m2_inv": float(cal["K_target_m2_inv"]),
+        "rho_e_dimensional_proxy_j_per_m3": float(rho_e_proxy),
+        "rho_e_efe_calibrated_j_per_m3": float(rho_e_efe),
+        "proxy_to_efe_ratio": float(cal["proxy_to_efe_ratio"]),
+        "m_equiv_proxy_kg": float(m_equiv),
+        "m_equiv_efe_kg": float(m_equiv_efe),
+        "m_over_jupiter_proxy": float(m_equiv / M_JUPITER_KG),
+        "m_over_jupiter_efe": float(m_equiv_efe / M_JUPITER_KG),
+        "m_over_sun_proxy": float(m_equiv / M_SUN_KG),
+        "m_over_sun_efe": float(m_equiv_efe / M_SUN_KG),
+        "kappa_efe": float(cal["KAPPA_EFE"]),
+        "inv_kappa_efe": float(cal["INV_KAPPA_EFE"]),
         "requires_negative_energy": "unknown",
         "curv_gate_pass": bool(len(reasons) == 0),
         "sanity_fail_reasons": reasons,

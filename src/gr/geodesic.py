@@ -51,7 +51,7 @@ def trace_null_ray(
     mass: float = 1.0,
     x0_over_m: float = 1000.0,
     dlambda: float = 0.5,
-    max_steps: int = 12_000,
+    max_steps: int = 36_000,
     rel_step: float = 1.0e-6,
 ) -> dict[str, np.ndarray | float]:
     """

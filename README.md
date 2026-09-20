@@ -2,9 +2,9 @@
 
 ## Constraint-Unified Residual Validator
 
-CURV is a deterministic constraint engine for validating gravitational residual structure against unified physical limits.
+**NEWGR** (CURV) is a *gravity-theory evaluation and evidence-trail framework* that: (1) tests GR/PPN/Yukawa-like models against deflection/weak-field constraints, (2) evaluates UAP behavior claims against conservation laws and unavoidable signatures, (3) enforces an append-only, auditable gate system for all runs and artifacts. See [Program Purpose](docs/PROGRAM_PURPOSE.md) for the canonical definition and three-lane architecture.
 
-It does not generate new physics.
+CURV does not generate new physics.
 It eliminates inconsistent deviations.
 
 Formal framing is available in `WHITEPAPER.md`.
@@ -19,6 +19,7 @@ Structural rules are versioned and frozen unless explicitly revised.
 * **What CURV is not:** evidence of new physics, propulsion claims, or anomaly interpretation.
 * **Reproduce certification:** `python certification/run_certification.py`
 * **Certified tags:** `v0.1.0-certified` (original Tier-1 anchor), `v0.1.1-certified` (publication-clean baseline with tests + docs).
+* **Instrument Console (local UI):** see [console/README.md](console/README.md) — evidence-first lab console over registries and scripts.
 
 **Regenerate Source Regime Atlas (power-vs-duration map)**
 ```powershell
@@ -301,23 +302,22 @@ Running module entrypoints regenerates artifacts from source.
 
 ---
 
-# Registry Model
+# Registries
 
-All runs append immutable rows to:
+All runs append immutable rows to registry files under `results/registry/`. Each registry has a `.csv` and `.jsonl` mirror.
 
-`results/registry/constraints_registry.csv`
+| Registry | Path | Purpose |
+|----------|------|---------|
+| results_registry | `results_registry.csv` / `.jsonl` | Theory runs, source plausibility, deflection curves, PPN/Yukawa sweeps |
+| constraints_registry | `constraints_registry.csv` / `.jsonl` | Phase 4B constraints |
+| ufo_observable_registry | `ufo_observable_registry.csv` / `.jsonl` | UFO observable evaluations |
+| ufo_behavior_registry | `ufo_behavior_registry.csv` / `.jsonl` | UFO flight-behavior evaluations |
+| exotic_tripwire_registry | `exotic_tripwire_registry.csv` / `.jsonl` | Exotic stress-energy tripwire |
+| bubble_registry | `bubble_registry.csv` / `.jsonl` | Bubble experiment analysis |
+| breakthrough_ladder_registry | `breakthrough_ladder_registry.csv` / `.jsonl` | Breakthrough ladder runs |
+| batch_registry | `batch_registry.csv` / `.jsonl` | Batch verdicts |
 
-Compact namespaced summaries are recorded in `notes`:
-
-* `gate0:`
-* `ppn_sweep:`
-* `tailv:`
-* `promote:`
-* `wfref:`
-* `curv_cost:`
-* `exotic_tripwire:` (in source plausibility: power-feasibility tripwire; in `scripts/run_exotic_tripwire.py`: stress-energy proxy)
-
-Full diagnostics remain in JSON artifacts.
+Compact namespaced summaries are recorded in `notes` (where applicable): `gate0:`, `ppn_sweep:`, `tailv:`, `promote:`, `wfref:`, `curv_cost:`, `exotic_tripwire:`. Full schema and writer scripts: [docs/REGISTRY_MAP.md](docs/REGISTRY_MAP.md). CI runs `python scripts/check_registry_docs.py` to ensure README registry paths match the canonical list.
 
 ---
 
@@ -389,6 +389,8 @@ Constraint precedes curiosity.
 
 | Doc | Purpose |
 |-----|---------|
+| `docs/PROGRAM_PURPOSE.md` | **Canonical program definition**, three lanes, breakthrough semantics |
+| `docs/REGISTRY_MAP.md` | Registry paths, writer scripts, row schemas |
 | `WHITEPAPER.md` | Formal framing |
 | `CURV_RUN_LOG.md` | Constraint sweeps, promotion evaluations, structural rules |
 | `docs/exotic_tripwire.md` | Exotic stress-energy tripwire (proxy instrument) |

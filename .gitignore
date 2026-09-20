@@ -33,3 +33,6 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Instrument console frontend
+console/frontend/node_modules/

@@ -15,7 +15,7 @@ class GRSchwarzschild:
     mass: float = 1.0
     rel_step: float = 1.0e-6
     x0_over_m: float = 1000.0
-    max_steps: int = 12_000
+    max_steps: int = 36_000
     name: str = "gr_schwarzschild"
     parameters: dict[str, float] = field(default_factory=dict)
 
@@ -24,12 +24,13 @@ class GRSchwarzschild:
 
     def deflection_angle_vs_b(self, b_over_m: float, setup: dict[str, Any]) -> float:
         h = float(setup.get("h", 0.5))
+        max_steps = int(setup.get("max_steps", self.max_steps))
         ray = trace_null_ray(
             b_over_m=float(b_over_m),
             mass=float(self.mass),
             x0_over_m=float(self.x0_over_m),
             dlambda=h,
-            max_steps=int(self.max_steps),
+            max_steps=max_steps,
             rel_step=float(self.rel_step),
         )
         return float(ray["alpha_numeric"])

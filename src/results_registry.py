@@ -72,6 +72,25 @@ CONSTRAINTS_REGISTRY_COLUMNS = [
     "artifacts",
     "notes",
 ]
+EXOTIC_TRIPWIRE_REGISTRY_COLUMNS = [
+    "timestamp_utc",
+    "run_id",
+    "input_run_id",
+    "git_hash",
+    "theory",
+    "tripwire_pass",
+    "wec_tripwire",
+    "nec_tripwire",
+    "scaling_tripwire",
+    "rho_proxy_min",
+    "rho_proxy_max_abs",
+    "nec_proxy_min",
+    "scaling_power_p",
+    "scaling_limit_p_max",
+    "exoticity_score",
+    "artifacts",
+    "notes",
+]
 
 
 def utc_now_iso() -> str:
@@ -140,6 +159,126 @@ def make_batch_id(
     ts = timestamp_utc or utc_now_iso()
     ts_token = ts.replace("-", "").replace(":", "").replace("T", "_")
     return f"{ts_token}_{_safe_token(model_mode)}_{_safe_token(weak_k_definition)}"
+
+
+UFO_OBSERVABLE_REGISTRY_COLUMNS = [
+    "timestamp_utc",
+    "run_id",
+    "git_hash",
+    "profile",
+    "policy",
+    "verdict",
+    "n_failed_gates",
+    "mass_kg_min",
+    "mass_kg_max",
+    "artifacts",
+    "notes",
+]
+
+UFO_BEHAVIOR_REGISTRY_COLUMNS = [
+    "timestamp_utc",
+    "run_id",
+    "git_hash",
+    "profile",
+    "policy",
+    "verdict",
+    "mass_kg_min",
+    "mass_kg_max",
+    "top_conflicts",
+    "artifacts",
+    "notes",
+]
+
+
+def make_ufo_observable_run_id(
+    profile: str,
+    policy: str,
+    mass_kg_max: float | str,
+    timestamp_utc: str | None = None,
+) -> str:
+    """Build run id for UFO observable evaluation."""
+    ts = timestamp_utc or utc_now_iso()
+    ts_token = ts.replace("-", "").replace(":", "").replace("T", "_")
+    m_token = _fmt_number_token(mass_kg_max)
+    return f"{ts_token}_ufo_obs_{_safe_token(profile)}_{_safe_token(policy)}_m{m_token}"
+
+
+def make_ufo_run_id(
+    profile: str,
+    policy: str,
+    mass_kg: float | str,
+    timestamp_utc: str | None = None,
+) -> str:
+    """Build deterministic run id for UFO behavior evaluation."""
+    ts = timestamp_utc or utc_now_iso()
+    ts_token = ts.replace("-", "").replace(":", "").replace("T", "_")
+    m_token = _fmt_number_token(mass_kg)
+    return f"{ts_token}_ufo_{_safe_token(profile)}_{_safe_token(policy)}_m{m_token}"
+
+
+BREAKTHROUGH_LADDER_REGISTRY_COLUMNS = [
+    "timestamp_utc",
+    "run_id",
+    "git_hash",
+    "policy",
+    "mass_kg_min",
+    "mass_kg_max",
+    "deepest_step",
+    "first_fail_step",
+    "artifacts",
+    "notes",
+]
+
+
+def make_breakthrough_ladder_run_id(timestamp_utc: str | None = None) -> str:
+    """Build run id for breakthrough ladder."""
+    ts = timestamp_utc or utc_now_iso()
+    ts_token = ts.replace("-", "").replace(":", "").replace("T", "_")
+    return f"{ts_token}_breakthrough_ladder"
+
+
+BUBBLE_REGISTRY_COLUMNS = [
+    "timestamp_utc",
+    "run_id",
+    "git_hash",
+    "bubble_radius_m",
+    "instrument",
+    "power_w",
+    "duration_s",
+    "curvature_m2_inv",
+    "rho_required_j_m3",
+    "total_energy_j",
+    "mass_equivalent_kg",
+    "verdict",
+    "bubble_feasible",
+    "dominant_failure_reason",
+    "policy",
+    "speculative_mode",
+    "interferometer_phase_shift_rad",
+    "clock_rate_shift",
+    "gravimeter_delta_g",
+    "beam_deflection_rad",
+    "candidate_flag",
+    "P_control_peak_w",
+    "required_bandwidth_hz",
+    "substrate_coupling_alpha",
+    "leakage_factor_1_s",
+    "artifacts",
+    "notes",
+]
+
+
+def make_bubble_run_id(
+    bubble_radius_m: float | str,
+    instrument: str,
+    timestamp_utc: str | None = None,
+) -> str:
+    """Build deterministic run id for bubble experiment analysis."""
+    ts = timestamp_utc or utc_now_iso()
+    ts_token = ts.replace("-", "").replace(":", "").replace("T", "_")
+    r_token = _fmt_number_token(bubble_radius_m)
+    inst_token = _safe_token(str(instrument))
+    return f"{ts_token}_bubble_R{r_token}_{inst_token}"
 
 
 def make_constraints_run_id(
