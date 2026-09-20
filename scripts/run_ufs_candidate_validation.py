@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.results_registry import append_csv_row, append_jsonl, get_git_hash
 from src.ufs_bridge import validate_readiness
