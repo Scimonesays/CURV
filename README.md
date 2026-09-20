@@ -17,8 +17,9 @@ Structural rules are versioned and frozen unless explicitly revised.
 
 * **What CURV is:** a reproducible, falsifier-first instrument for constraint-based gravity deviation testing.
 * **What CURV is not:** evidence of new physics, propulsion claims, or anomaly interpretation.
+* **Current certification contract:** [`v0.2`](certification/CONSTRAINT_CERTIFICATION_SPEC_v0.2.md) — computational/pipeline certification with explicit scientific scope boundaries.
 * **Reproduce certification:** `python certification/run_certification.py`
-* **Certified tags:** `v0.1.0-certified` (original Tier-1 anchor), `v0.1.1-certified` (publication-clean gravity-core baseline). These tags are historical certified snapshots; current `main` includes later console/UFS integration work and must be judged by current CI/certification results rather than inheriting a tag's certification.
+* **Historical certified tags:** `v0.1.0-certified` and `v0.1.1-certified`. They are retained as historical snapshots; current `main` must pass the current v0.2 contract rather than inheriting an old tag's certification.
 * **Instrument Console (local UI):** see [console/README.md](console/README.md) — evidence-first lab console over registries and scripts.
 * **Universal Frequency Spectrum bridge:** the console can read a sibling/configured UFS canonical dataset and run structural-readiness validation without modifying UFS. See [docs/UFS_INTEGRATION.md](docs/UFS_INTEGRATION.md).
 
