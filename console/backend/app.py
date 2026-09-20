@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -32,12 +33,19 @@ from .ufs import overview as get_ufs_overview, record as get_ufs_record
 ensure_dirs()
 
 app = FastAPI(title="CURV Instrument Console", version="0.1.0")
+_default_origins = [
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+    "http://127.0.0.1:8765",
+    "http://localhost:8765",
+]
+_extra_origins = [x.strip() for x in os.environ.get("CURV_CORS_ORIGINS", "").split(",") if x.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=list(dict.fromkeys([*_default_origins, *_extra_origins])),
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 
