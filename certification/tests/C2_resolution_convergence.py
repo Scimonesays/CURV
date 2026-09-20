@@ -1,85 +1,114 @@
-"""C2: Resolution convergence certification test."""
+"""C2: Schwarzschild integrator resolution-convergence certification test."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
-from typing import Any
 
-from .common import PASS, fail_result, guard_run, load_json, run_sweep
+import numpy as np
+
+from src.observables.deflection_curve import compute_deflection_curve, mean_normalized_curve_difference
+from src.theories.gr_schwarzschild import GRSchwarzschild
+
+from .common import PASS, guard_run
 
 
 def run(test_config: dict, out_dir: Path) -> dict:
     def _impl() -> dict:
-        n_points_seq = [int(x) for x in test_config["n_points_seq"]]
+        window = tuple(float(x) for x in test_config["range_window"])
+        n_points = int(test_config["n_points"])
         h_seq = [float(x) for x in test_config["h_seq"]]
-        gamma_tol = float(test_config.get("gamma_band_tol", 0.02))
-        h_pair_tol = float(test_config.get("h_pair_tol", 0.01))
+        max_pair_delta = float(test_config["max_pair_delta"])
+        weak_field_tail_max = float(test_config["weak_field_tail_max"])
+        eps = 1.0e-15
 
-        runs: list[dict[str, Any]] = []
-        for n_points in n_points_seq:
-            for h in h_seq:
-                cfg = dict(test_config["base_sweep"])
-                cfg["n_points"] = n_points
-                cfg["h"] = h
-                run_data = run_sweep(cfg, out_dir, f"C2_n{n_points}_h{h}")
-                summary = load_json(run_data["summary_json"])
-                run_data["summary"] = summary
-                runs.append(run_data)
+        if len(h_seq) < 3:
+            raise ValueError("C2 requires at least three step sizes.")
+        if any(h <= 0 for h in h_seq):
+            raise ValueError("C2 step sizes must be positive.")
+        if any(h_seq[i + 1] >= h_seq[i] for i in range(len(h_seq) - 1)):
+            raise ValueError("C2 h_seq must be strictly decreasing (coarser -> finer).")
 
-        # Use first h for monotonic trend with resolution.
-        trend: list[float] = []
-        for n_points in n_points_seq:
-            selected = [r for r in runs if int(r["summary"]["n_points"]) == n_points and abs(float(r["summary"]["h"]) - h_seq[0]) < 1.0e-12]
-            if not selected:
-                return fail_result("Missing resolution run in C2.", ["C2_FAIL_NUMERIC"])
-            best = selected[0]["summary"].get("best_gamma_ppn")
-            if isinstance(best, str):
-                return fail_result("NA best_gamma_ppn encountered in C2.", ["C2_FAIL_DIVERGENCE"])
-            trend.append(abs(float(best) - 1.0))
+        gr = GRSchwarzschild()
+        curves: dict[str, list[float]] = {}
+        weak_tail: dict[str, float] = {}
+        monotonic_by_h: dict[str, bool] = {}
 
-        monotonic = all(trend[i + 1] <= trend[i] + 1.0e-12 for i in range(len(trend) - 1))
-        bounded = max(trend) <= gamma_tol
+        for h in h_seq:
+            _, alpha, _, rel_err = compute_deflection_curve(
+                gr,
+                bmin_over_m=window[0],
+                bmax_over_m=window[1],
+                n_points=n_points,
+                setup={"h": h},
+                reference_mode="analytic",
+            )
+            key = f"{h:.12g}"
+            curves[key] = [float(x) for x in alpha]
+            weak_tail[key] = float(np.median(rel_err[-min(5, len(rel_err)):]))
+            monotonic_by_h[key] = bool(np.all(np.diff(alpha) < 0.0))
 
-        # Cross-check h perturbation stability at each resolution.
-        h_pair_max_delta = 0.0
-        for n_points in n_points_seq:
-            vals: list[float] = []
-            for h in h_seq:
-                selected = [r for r in runs if int(r["summary"]["n_points"]) == n_points and abs(float(r["summary"]["h"]) - h) < 1.0e-12]
-                if not selected:
-                    continue
-                best = selected[0]["summary"].get("best_gamma_ppn")
-                if isinstance(best, str):
-                    continue
-                vals.append(float(best))
-            if len(vals) >= 2:
-                h_pair_max_delta = max(h_pair_max_delta, abs(vals[0] - vals[1]))
+        pair_deltas: list[float] = []
+        for i in range(len(h_seq) - 1):
+            a = np.asarray(curves[f"{h_seq[i]:.12g}"], dtype=float)
+            b = np.asarray(curves[f"{h_seq[i + 1]:.12g}"], dtype=float)
+            pair_deltas.append(mean_normalized_curve_difference(a, b))
+
+        h_pair_max_delta = max(pair_deltas)
+        convergence_nonworsening = all(
+            pair_deltas[i + 1] <= pair_deltas[i] + eps for i in range(len(pair_deltas) - 1)
+        )
+        weak_field_ok = max(weak_tail.values()) <= weak_field_tail_max
+        monotonic_ok = all(monotonic_by_h.values())
 
         codes: list[str] = []
-        if not monotonic and not bounded:
-            codes.append("C2_FAIL_NONMONOTONIC")
-        if max(trend) > gamma_tol:
+        if h_pair_max_delta > max_pair_delta:
             codes.append("C2_FAIL_DIVERGENCE")
-        if h_pair_max_delta > h_pair_tol:
-            codes.append("C2_FAIL_OSCILLATION")
+        if not convergence_nonworsening:
+            codes.append("C2_FAIL_NONMONOTONIC")
+        if not monotonic_ok:
+            codes.append("C2_FAIL_CURVE_MONOTONICITY")
+        if not weak_field_ok:
+            codes.append("C2_FAIL_WEAK_FIELD_SANITY")
+
+        artifact_rel = "C2_schwarzschild_convergence.json"
+        artifact_path = out_dir / artifact_rel
+        artifact_payload = {
+            "range_window": list(window),
+            "n_points": n_points,
+            "h_seq": h_seq,
+            "pair_deltas": pair_deltas,
+            "h_pair_max_delta": h_pair_max_delta,
+            "max_pair_delta": max_pair_delta,
+            "convergence_nonworsening": convergence_nonworsening,
+            "weak_field_tail_error_by_h": weak_tail,
+            "weak_field_tail_max": weak_field_tail_max,
+            "monotonic_deflection_by_h": monotonic_by_h,
+            "curves": curves,
+        }
+        artifact_path.write_text(json.dumps(artifact_payload, indent=2), encoding="utf-8")
 
         status = PASS if not codes else "FAIL"
-        details = "C2 resolution convergence is within certified tolerance." if not codes else "C2 convergence checks failed."
         return {
             "status": status,
-            "details": details,
+            "details": (
+                "C2 Schwarzschild integrator converges under step refinement."
+                if not codes
+                else "C2 Schwarzschild integrator convergence checks failed."
+            ),
             "failure_codes": codes,
             "metrics": {
-                "trend_abs_gamma_minus_one": trend,
-                "n_points_seq": n_points_seq,
-                "h_seq": h_seq,
-                "gamma_band_tol": gamma_tol,
                 "h_pair_max_delta": h_pair_max_delta,
-                "h_pair_tol": h_pair_tol,
-                "commands_invoked": [r["command"] for r in runs],
+                "pair_deltas": pair_deltas,
+                "h_seq": h_seq,
+                "max_pair_delta": max_pair_delta,
+                "convergence_nonworsening": convergence_nonworsening,
+                "weak_field_tail_error_by_h": weak_tail,
+                "weak_field_tail_max": weak_field_tail_max,
+                "monotonic_deflection_by_h": monotonic_by_h,
+                "commands_invoked": ["direct GRSchwarzschild compute_deflection_curve refinement"],
             },
-            "artifacts": [str(r["summary_json"].relative_to(out_dir).as_posix()) for r in runs],
+            "artifacts": [artifact_rel],
         }
 
     return guard_run(_impl, "C2_FAIL_DIVERGENCE")
-
