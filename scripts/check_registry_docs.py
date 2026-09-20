@@ -38,7 +38,12 @@ def _extract_registry_names_from_text(text: str) -> set[str]:
     found: set[str] = set()
     # Match patterns like results_registry, results_registry.csv, results_registry.jsonl
     for m in re.finditer(r"([a-z_]+_registry)(?:\.csv|\.jsonl)?", text, re.IGNORECASE):
-        found.add(m.group(1).lower())
+        name = m.group(1).lower()
+        # Do not mistake this validator's own filename (check_registry_docs.py)
+        # for an append-only evidence registry.
+        if name == "check_registry":
+            continue
+        found.add(name)
     return found
 
 
