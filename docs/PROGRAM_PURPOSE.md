@@ -10,13 +10,14 @@
 
 1. tests GR/PPN/Yukawa-like models against deflection/weak-field constraints,
 2. evaluates UAP behavior claims against conservation laws and unavoidable signatures,
-3. enforces an append-only, auditable gate system for all runs and artifacts.
+3. enforces an append-only, auditable gate system for all runs and artifacts,
+4. optionally acts as a read-only research-readiness validator for Universal Frequency Spectrum frontier/question records.
 
 This keeps the repo coherent: not "cool physics stuff + UFO stuff," but a unified instrument for constraint-driven analysis.
 
 ---
 
-## Three Lanes
+## Four Lanes
 
 Each lane follows the same pattern: **inputs → gates → verdict → artifacts → registry row**.
 
@@ -44,6 +45,15 @@ Each lane follows the same pattern: **inputs → gates → verdict → artifacts
 - **Outputs:** Curvature cost JSON, source plausibility CSV, exotic tripwire atlas, registry rows in `results_registry`, `exotic_tripwire_registry`.
 - **Scripts:** `run_source_plausibility.py`, `run_exotic_tripwire.py`, `run_bubble_experiment_analysis.py`.
 
+### 4. UFS Research Validation Lane
+
+- **Scope:** Read-only Universal Frequency Spectrum frontier/question and typed-gap records.
+- **Inputs:** Canonical UFS record ID, policy, speculative flag.
+- **Gates:** source traceability, candidate/question specificity, observable specificity, bridge/coupling specificity, energy-accounting status.
+- **Outputs:** research-readiness verdict, JSON artifact, registry row in `ufs_validation_registry`.
+- **Script:** `run_ufs_candidate_validation.py`.
+- **Boundary:** a readiness verdict never changes UFS canonical scientific evidence status automatically.
+
 ---
 
 ## Breakthrough Definition
@@ -62,3 +72,4 @@ The system must never print "breakthrough achieved" by accident. Speculative pas
 - [Registry Map](REGISTRY_MAP.md) — Registries, writer scripts, row schemas
 - [README](../README.md) — Quickstart and architecture overview
 - [WHITEPAPER](../WHITEPAPER.md) — Formal framing
+- [UFS Integration](UFS_INTEGRATION.md) — Universal Frequency Spectrum research-validator contract
