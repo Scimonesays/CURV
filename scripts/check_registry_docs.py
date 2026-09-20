@@ -29,6 +29,7 @@ CANONICAL_REGISTRIES = frozenset({
     "bubble_registry",
     "breakthrough_ladder_registry",
     "batch_registry",
+    "ufs_validation_registry",
 })
 
 
