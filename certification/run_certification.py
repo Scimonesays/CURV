@@ -206,6 +206,10 @@ def run() -> int:
         return 0
     print("CURV CERTIFICATION STATUS: FAIL")
     print(f"Failure codes: {all_failure_codes}")
+    for test_id, data in tests_report.items():
+        if data.get("status") != "PASS":
+            print(f"{test_id}: {data.get('details', '')}")
+            print(json.dumps(data.get("metrics", {}), indent=2, sort_keys=True, ensure_ascii=True))
     return 1
 
 
