@@ -1,5 +1,5 @@
 export type Policy = "strict" | "normal" | "sandbox";
-export type Lane = "theory" | "claims" | "exotic" | "certification";
+export type Lane = "theory" | "claims" | "exotic" | "ufs" | "certification";
 export type View =
   | "evidence"
   | "run"
@@ -8,6 +8,7 @@ export type View =
   | "scorecard"
   | "ladder"
   | "atlas"
+  | "ufs"
   | "certification";
 
 export type Status = "PASS" | "FAIL" | "RUNNING" | "WARNING";
@@ -44,6 +45,8 @@ export const fetchCertDetail = (id: string) => api<CertDetail>(`/api/certificati
 export const fetchSurvivorship = (runId: string) =>
   api<Survivorship>(`/api/survivorship/${encodeURIComponent(runId)}`);
 export const fetchArtifactScan = () => api<{ dirs: ArtifactDir[] }>("/api/artifacts/scan");
+export const fetchUfsOverview = () => api<UfsOverview>("/api/ufs");
+export const fetchUfsRecord = (id: string) => api<UfsRecordResponse>(`/api/ufs/records/${encodeURIComponent(id)}`);
 export const fetchJobs = () => api<{ jobs: Job[] }>("/api/jobs");
 export const fetchJob = (id: string) => api<Job>(`/api/jobs/${encodeURIComponent(id)}`);
 export const createJob = (body: {
@@ -190,6 +193,43 @@ export interface ArtifactDir {
   path: string;
   indexed: boolean;
   registry: string | null;
+}
+
+export interface UfsFrontierRecord {
+  id: string;
+  name: string;
+  domain: string;
+  status: string;
+  evidence?: { class?: string; label?: string } | null;
+  predicted_or_observed_signal?: string | null;
+  required_bridge?: string | null;
+  energy_accounting?: Record<string, unknown> | null;
+}
+
+export interface UfsGapRecord {
+  id: string;
+  type: string;
+  name: string;
+  status: string;
+  scope: string;
+  meaning: string;
+  related_ids: string[];
+  source_ids: string[];
+}
+
+export interface UfsOverview {
+  connected: boolean;
+  error?: string | null;
+  root?: string | null;
+  manifest?: { schema_version?: string; counts?: Record<string, number>; audit?: Record<string, unknown> } | null;
+  frontier: UfsFrontierRecord[];
+  gaps: UfsGapRecord[];
+}
+
+export interface UfsRecordResponse {
+  root: string;
+  record_type: string;
+  record: Record<string, unknown>;
 }
 
 export interface Job {
