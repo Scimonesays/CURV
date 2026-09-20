@@ -1,4 +1,4 @@
-"""C1: Reference reproduction certification test."""
+"""C1: Internal GR-limit reference reproduction certification test."""
 
 from __future__ import annotations
 
@@ -32,30 +32,40 @@ def run(test_config: dict, out_dir: Path) -> dict:
                 metrics={"run_id": s1["run_id"]},
             )
 
-        delta = abs(float(best_gamma) - 1.0)
-        gamma_bound = float(test_config["gamma_bound"])
+        expected_gamma = float(test_config.get("expected_gamma_ppn", 1.0))
+        gamma_tol = float(test_config.get("gamma_center_tol", 1.0e-12))
+        delta = abs(float(best_gamma) - expected_gamma)
         hash1 = stable_hash(_extract_metrics(summary1))
         hash2 = stable_hash(_extract_metrics(summary2))
 
         codes: list[str] = []
-        if delta > gamma_bound:
-            codes.append("C1_FAIL_BOUND")
+        if delta > gamma_tol:
+            codes.append("C1_FAIL_REFERENCE_CENTER")
         if hash1 != hash2:
             codes.append("C1_FAIL_DRIFT")
 
         status = PASS if not codes else "FAIL"
-        details = "C1 reproduced gamma bound deterministically." if not codes else "C1 failed bound and/or rerun drift checks."
+        details = (
+            "C1 reproduced the internal GR-limit reference deterministically."
+            if not codes
+            else "C1 failed the internal reference-center and/or deterministic rerun check."
+        )
         return {
             "status": status,
             "details": details,
             "failure_codes": codes,
             "metrics": {
                 "best_gamma_ppn": float(best_gamma),
-                "abs_gamma_minus_one": delta,
-                "gamma_bound": gamma_bound,
+                "expected_gamma_ppn": expected_gamma,
+                "abs_gamma_delta": delta,
+                "gamma_center_tol": gamma_tol,
                 "rerun_hash_1": hash1,
                 "rerun_hash_2": hash2,
                 "commands_invoked": [s1["command"], s2["command"]],
+                "scope_note": (
+                    "This is an internal GR-limit/pipeline reference test, not a reproduction "
+                    "of an external observational bound."
+                ),
             },
             "artifacts": [
                 str(s1["summary_json"].relative_to(out_dir).as_posix()),
@@ -65,4 +75,3 @@ def run(test_config: dict, out_dir: Path) -> dict:
         }
 
     return guard_run(_impl, "C1_FAIL_NUMERIC")
-
