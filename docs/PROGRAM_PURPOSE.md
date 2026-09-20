@@ -1,4 +1,4 @@
-# NEWGR Program Purpose
+# CURV Program Purpose
 
 **Authoritative definition.** All documentation and code comments should align with this spine.
 
@@ -6,7 +6,7 @@
 
 ## Canonical Statement
 
-**NEWGR** is a *gravity-theory evaluation and evidence-trail framework* that:
+**CURV** is a *constraint-driven physics evaluation and evidence-trail framework* that:
 
 1. tests GR/PPN/Yukawa-like models against deflection/weak-field constraints,
 2. evaluates UAP behavior claims against conservation laws and unavoidable signatures,
@@ -15,11 +15,13 @@
 
 This keeps the repo coherent: not "cool physics stuff + UFO stuff," but a unified instrument for constraint-driven analysis.
 
+**Naming:** CURV is the current project name. Any `NEWGR` wording in older frozen artifacts, tags, or historical run records is legacy provenance and should not be treated as the current product name.
+
 ---
 
-## Four Lanes
+## Four Research Lanes
 
-Each lane follows the same pattern: **inputs → gates → verdict → artifacts → registry row**.
+Each research lane follows the same pattern: **inputs → gates → verdict → artifacts → registry row**. The console also exposes **Certification** as a separate assurance surface; certification is not counted as a fifth research lane.
 
 ### 1. Theory Validation Lane
 
