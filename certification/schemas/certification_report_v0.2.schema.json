@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CURV Certification Report v0.2",
+  "type": "object",
+  "required": [
+    "cert_version",
+    "timestamp",
+    "git_commit",
+    "tests",
+    "overall_status",
+    "failure_codes"
+  ],
+  "properties": {
+    "cert_version": {
+      "const": "0.2"
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "git_commit": {
+      "type": "string",
+      "minLength": 7
+    },
+    "tests": {
+      "type": "object",
+      "required": [
+        "C1_reference_reproduction",
+        "C2_resolution_convergence",
+        "C3_gate_sensitivity",
+        "C4_numerical_robustness",
+        "C5_artifact_integrity",
+        "C6_regression_lock"
+      ],
+      "properties": {
+        "C1_reference_reproduction": {
+          "$ref": "#/$defs/testResult"
+        },
+        "C2_resolution_convergence": {
+          "$ref": "#/$defs/testResult"
+        },
+        "C3_gate_sensitivity": {
+          "$ref": "#/$defs/testResult"
+        },
+        "C4_numerical_robustness": {
+          "$ref": "#/$defs/testResult"
+        },
+        "C5_artifact_integrity": {
+          "$ref": "#/$defs/testResult"
+        },
+        "C6_regression_lock": {
+          "$ref": "#/$defs/testResult"
+        }
+      },
+      "additionalProperties": false
+    },
+    "overall_status": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "failure_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "testResult": {
+      "type": "object",
+      "required": [
+        "status",
+        "details",
+        "metrics",
+        "artifacts",
+        "failure_codes"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        },
+        "details": {
+          "type": "string"
+        },
+        "metrics": {
+          "type": "object"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "failure_codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
