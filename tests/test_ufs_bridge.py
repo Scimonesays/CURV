@@ -16,11 +16,13 @@ def _write(root: Path, name: str, payload: dict) -> None:
 
 def _fixture(tmp_path: Path) -> Path:
     root = tmp_path / "Universal-Frequency-Spectrum"
-    _write(root, "manifest.json", {"schema_version": "1.0.0", "counts": {"frontier": 2, "gaps": 1}})
+    _write(root, "manifest.json", {"project": "Universal Frequency Spectrum", "schema_version": "1.0.0", "dataset_type": "manifest", "counts": {"frontier": 2, "gaps": 1}})
     _write(
         root,
         "frontier.json",
         {
+            "schema_version": "1.0.0",
+            "dataset_type": "frontier",
             "records": [
                 {
                     "id": "P4-TEST-READY",
@@ -53,6 +55,8 @@ def _fixture(tmp_path: Path) -> Path:
         root,
         "gaps.json",
         {
+            "schema_version": "1.0.0",
+            "dataset_type": "gaps",
             "records": [
                 {
                     "id": "GAP-TEST-001",
@@ -67,9 +71,9 @@ def _fixture(tmp_path: Path) -> Path:
             ]
         },
     )
-    _write(root, "phenomena.json", {"records": []})
-    _write(root, "interactions.json", {"records": []})
-    _write(root, "claims.json", {"records": []})
+    _write(root, "phenomena.json", {"schema_version": "1.0.0", "dataset_type": "phenomena", "records": []})
+    _write(root, "interactions.json", {"schema_version": "1.0.0", "dataset_type": "interactions", "records": []})
+    _write(root, "claims.json", {"schema_version": "1.0.0", "dataset_type": "claims", "records": []})
     return root
 
 
@@ -107,3 +111,12 @@ def test_missing_repo_is_safe(tmp_path: Path):
     overview = get_overview(str(tmp_path / "missing"))
     assert overview["connected"] is False
     assert overview["frontier"] == []
+
+
+def test_invalid_manifest_is_rejected(tmp_path: Path):
+    root = _fixture(tmp_path)
+    manifest = root / "data" / "canonical" / "manifest.json"
+    manifest.write_text(json.dumps({"project": "Not UFS", "schema_version": "1.0.0", "dataset_type": "manifest"}), encoding="utf-8")
+    overview = get_overview(str(root))
+    assert overview["connected"] is False
+    assert "project identity" in str(overview["error"])
