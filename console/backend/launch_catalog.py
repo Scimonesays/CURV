@@ -122,6 +122,18 @@ CATALOG: dict[str, dict[str, Any]] = {
         ],
         "inject_policy": True,
     },
+    "ufs_candidate_validation": {
+        "label": "UFS frontier readiness validation",
+        "lane": "ufs",
+        "script": "scripts/run_ufs_candidate_validation.py",
+        "fields": [
+            {"name": "record_id", "flag": "--record-id", "type": "str", "default": "P4-F012", "required": True},
+            {"name": "ufs_repo", "flag": "--ufs-repo", "type": "str", "default": ""},
+            {"name": "notes", "flag": "--notes", "type": "str", "default": ""},
+        ],
+        "inject_policy": True,
+        "global_speculative_flag": "--speculative",
+    },
     "certification": {
         "label": "Certification C1–C6",
         "lane": "certification",
@@ -170,6 +182,11 @@ def build_argv(
 
     if meta.get("inject_policy"):
         argv.extend(["--policy", policy])
+
+    global_speculative_flag = meta.get("global_speculative_flag")
+    if speculative and global_speculative_flag:
+        argv.append(str(global_speculative_flag))
+        speculative_effective = True
 
     for field in meta.get("fields") or []:
         name = field["name"]
