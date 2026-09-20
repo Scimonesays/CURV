@@ -9,6 +9,8 @@ from typing import Any
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_SIBLING = ROOT_DIR.parent / "Universal-Frequency-Spectrum"
+EXPECTED_PROJECT = "Universal Frequency Spectrum"
+EXPECTED_SCHEMA_VERSION = "1.0.0"
 
 
 def discover_ufs_repo(explicit: str | None = None) -> Path | None:
@@ -39,22 +41,36 @@ def load_bundle(explicit: str | None = None) -> tuple[Path, dict[str, Any]]:
             "Universal-Frequency-Spectrum not found. Set UFS_REPO_PATH or clone it "
             "beside CURV."
         )
-    names = [
-        "manifest.json",
-        "frontier.json",
-        "gaps.json",
-        "phenomena.json",
-        "interactions.json",
-        "claims.json",
-    ]
-    bundle = {name.removesuffix(".json"): _read(root, name) for name in names}
+
+    manifest = _read(root, "manifest.json")
+    if manifest.get("project") != EXPECTED_PROJECT:
+        raise ValueError(f"Unexpected UFS project identity: {manifest.get('project')!r}")
+    if manifest.get("dataset_type") != "manifest":
+        raise ValueError("UFS manifest is missing dataset_type='manifest'")
+    if manifest.get("schema_version") != EXPECTED_SCHEMA_VERSION:
+        raise ValueError(
+            f"Unsupported UFS schema version: {manifest.get('schema_version')!r}; "
+            f"expected {EXPECTED_SCHEMA_VERSION}"
+        )
+
+    names = ["frontier", "gaps", "phenomena", "interactions", "claims"]
+    bundle: dict[str, Any] = {"manifest": manifest}
+    for name in names:
+        doc = _read(root, f"{name}.json")
+        if doc.get("dataset_type") != name:
+            raise ValueError(f"UFS {name}.json has dataset_type={doc.get('dataset_type')!r}")
+        if doc.get("schema_version") != EXPECTED_SCHEMA_VERSION:
+            raise ValueError(f"UFS {name}.json schema version does not match the supported contract")
+        if not isinstance(doc.get("records"), list):
+            raise ValueError(f"UFS {name}.json records must be an array")
+        bundle[name] = doc
     return root, bundle
 
 
 def get_overview(explicit: str | None = None) -> dict[str, Any]:
     try:
         root, bundle = load_bundle(explicit)
-    except FileNotFoundError as exc:
+    except (FileNotFoundError, ValueError) as exc:
         return {
             "connected": False,
             "error": str(exc),
