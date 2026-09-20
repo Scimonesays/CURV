@@ -30,6 +30,9 @@ LANE_REGISTRIES: dict[str, list[str]] = {
         "exotic_tripwire_registry",
         "bubble_registry",
     ],
+    "ufs": [
+        "ufs_validation_registry",
+    ],
     "certification": [],
 }
 
@@ -42,6 +45,7 @@ ALL_REGISTRIES = [
     "breakthrough_ladder_registry",
     "exotic_tripwire_registry",
     "bubble_registry",
+    "ufs_validation_registry",
 ]
 
 
