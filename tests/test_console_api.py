@@ -103,3 +103,34 @@ def test_job_create_unknown_catalog():
         json={"catalog_id": "nope", "params": {}, "policy": "strict", "speculative": False},
     )
     assert r.status_code == 404
+
+
+def test_job_cancel_reaches_cancelled():
+    created = client.post(
+        "/api/jobs",
+        json={"catalog_id": "instrument_hold", "params": {"seconds": 10.0}, "policy": "strict", "speculative": False},
+    )
+    assert created.status_code == 200
+    job_id = created.json()["job_id"]
+
+    deadline = time.time() + 3.0
+    while time.time() < deadline:
+        state = client.get(f"/api/jobs/{job_id}").json()
+        if state["status"] in {"RUNNING", "CANCELLING"}:
+            break
+        time.sleep(0.05)
+
+    cancelled = client.post(f"/api/jobs/{job_id}/cancel")
+    assert cancelled.status_code == 200
+
+    deadline = time.time() + 5.0
+    final = None
+    while time.time() < deadline:
+        final = client.get(f"/api/jobs/{job_id}").json()
+        if final["status"] == "CANCELLED":
+            break
+        time.sleep(0.05)
+
+    assert final is not None
+    assert final["status"] == "CANCELLED"
+    assert final["cancel_requested"] is True
