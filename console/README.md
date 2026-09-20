@@ -1,6 +1,6 @@
 # CURV Instrument Console
 
-Local laboratory instrument UI for NEWGR / CURV.
+Local laboratory instrument UI for CURV.
 
 Opens on **evidence** (immutable registries → artifacts), not a dashboard.
 Launches existing Python scripts; does not reimplement physics.
@@ -12,7 +12,7 @@ Launches existing Python scripts; does not reimplement physics.
 From the repository root:
 
 ```powershell
-pip install -r requirements.txt -r console/requirements.txt
+pip install -r requirements.txt
 python -m console
 ```
 
@@ -22,7 +22,7 @@ API listens on `http://127.0.0.1:8765`.
 
 ```powershell
 cd console/frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -32,7 +32,7 @@ Open `http://127.0.0.1:5173` (Vite proxies `/api` to the backend).
 
 ```powershell
 cd console/frontend
-npm install
+npm ci
 npm run build
 cd ../..
 python -m console
